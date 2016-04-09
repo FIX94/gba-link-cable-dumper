@@ -88,7 +88,8 @@ typedef enum { false, true } bool;
 #define REG_DM3SAD  (*(volatile u32*)0x40000D4) 
 #define REG_DM3DAD  (*(volatile u32*)0x40000D8) 
 #define REG_DM3CNT  (*(volatile u32*)0x40000DC)
-
+#define REG_DM3CNT_H (*(volatile u16*)0x40000DE)
+#define REG_WAITCNT (*(volatile u16*)0x4000204)
 
 //-----------------------------------------------------------------------
 // Common EEPROM Routines
@@ -96,16 +97,20 @@ typedef enum { false, true } bool;
 
 void EEPROM_SendPacket( u16* packet, int size ) 
 { 
+   REG_WAITCNT = (REG_WAITCNT & 0xF8FF) | 0x0300;
    REG_DM3SAD = (u32)packet; 
    REG_DM3DAD = (u32)EEPROM_ADDRESS; 
    REG_DM3CNT = 0x80000000 + size; 
+   while((REG_DM3CNT_H & 0x8000) != 0) ;
 } 
 
 void EEPROM_ReceivePacket( u16* packet, int size ) 
 { 
+   REG_WAITCNT = (REG_WAITCNT & 0xF8FF) | 0x0300;
    REG_DM3SAD = (u32)EEPROM_ADDRESS; 
    REG_DM3DAD = (u32)packet; 
    REG_DM3CNT = 0x80000000 + size; 
+   while((REG_DM3CNT_H & 0x8000) != 0) ;
 } 
 
 //-----------------------------------------------------------------------
@@ -187,7 +192,7 @@ void EEPROM_Write_512B( volatile u8 offset, u8* source ) // source must point to
       in_byte = *in_pos++; 
       for( bit = 7; bit >= 0; --bit ) 
       { 
-         *out_pos++ = in_byte>>bit; 
+         *out_pos++ = (in_byte>>bit)&1; 
       } 
    } 
 
@@ -641,6 +646,7 @@ u32 SaveSize(u8* data, s32 gamesize)
 
 	u32 *pak= ((u32*)0x08000000);
 	s32 x;
+	u16 i;
 	s32 size = gamesize/4;
 
 
@@ -658,10 +664,9 @@ u32 SaveSize(u8* data, s32 gamesize)
 		case 0x52504545:
 			if ((pak[x+1] & 0x00FFFFFF) == 0x005F4D4F){
 				GetSave_EEPROM_8KB(data);
-				if (memcmp(data,data+0x200,8) != 0 ||
-					memcmp(data,data+0x400,8) != 0 ||
-					memcmp(data,data+0x600,8) != 0){
-					return 0x2000;			//EEPROM_8KB
+				for(i = 8; i < 0x800; i += 8) {
+					if(memcmp(data, data+i, 8) != 0)
+						return 0x2000;			// EEPROM_8KB
 				}
 				return 0x200;					// EEPROM_512B
 			}

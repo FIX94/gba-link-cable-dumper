@@ -23,7 +23,7 @@ void printmain()
 {
 	printf("\x1b[2J");
 	printf("\x1b[37m");
-	printf("GBA Link Cable Dumper v1.1 by FIX94\n");
+	printf("GBA Link Cable Dumper v1.2 by FIX94\n");
 	printf("Save Support based on SendSave by Chishm\n");
 }
 

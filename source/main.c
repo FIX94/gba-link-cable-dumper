@@ -23,7 +23,7 @@ void printmain()
 {
 	printf("\x1b[2J");
 	printf("\x1b[37m");
-	printf("GBA Link Cable Dumper v1.2 by FIX94\n");
+	printf("GBA Link Cable Dumper v1.3 by FIX94\n");
 	printf("Save Support based on SendSave by Chishm\n");
 }
 
@@ -149,6 +149,12 @@ void sendsafe(u32 msg)
 	SI_Transfer(1,cmdbuf,5,resbuf,1,transcb,0);
 	wait_for_transfer();
 }
+void sendsafe_wait(u32 msg)
+{
+	sendsafe(msg);
+	//wait for GBA
+	usleep(5000);
+}
 u32 recvfast()
 {
 	cmdbuf[0]=0x14; //read
@@ -168,6 +174,30 @@ bool dirExists(const char *path)
 		return true;
 	}
 	return false;
+}
+void createFile(const char *path, size_t size)
+{
+	int fd = open(path, O_WRONLY|O_CREAT);
+	if(fd >= 0)
+	{
+		ftruncate(fd, size);
+		close(fd);
+	}
+}
+void warnError(char *msg)
+{
+	puts(msg);
+	VIDEO_WaitVSync();
+	VIDEO_WaitVSync();
+	sleep(2);
+}
+void fatalError(char *msg)
+{
+	puts(msg);
+	VIDEO_WaitVSync();
+	VIDEO_WaitVSync();
+	sleep(5);
+	exit(0);
 }
 int main(int argc, char *argv[]) 
 {
@@ -195,21 +225,13 @@ int main(int argc, char *argv[])
 	if(!fatInitDefault())
 	{
 		printmain();
-		printf("ERROR: No usable device found to write dumped files to!\n");
-		VIDEO_WaitVSync();
-		VIDEO_WaitVSync();
-		sleep(5);
-		exit(0);
+		fatalError("ERROR: No usable device found to write dumped files to!");
 	}
 	mkdir("/dumps", S_IREAD | S_IWRITE);
 	if(!dirExists("/dumps"))
 	{
 		printmain();
-		printf("ERROR: Could not create dumps folder, make sure you have a supported device connected!\n");
-		VIDEO_WaitVSync();
-		VIDEO_WaitVSync();
-		sleep(5);
-		exit(0);
+		fatalError("ERROR: Could not create dumps folder, make sure you have a supported device connected!");
 	}
 	int i;
 	while(1)
@@ -260,7 +282,7 @@ int main(int argc, char *argv[])
 			for(i = 0; i < 0xC0; i+=4)
 			{
 				sendsafe(__builtin_bswap32(*(vu32*)(gba_mb_gba+i)));
-				if(!(resbuf[0]&0x2)) printf("Possible error %02x\n",resbuf[0]);
+				//if(!(resbuf[0]&0x2)) printf("Possible error %02x\n",resbuf[0]);
 			}
 			//printf("Header done! Sending ROM...\n");
 			for(i = 0xC0; i < sendsize; i+=4)
@@ -272,7 +294,7 @@ int main(int argc, char *argv[])
 				enc^=((~(i+(0x20<<20)))+1);
 				enc^=0x20796220;
 				sendsafe(enc);
-				if(!(resbuf[0]&0x2)) printf("Possible error %02x\n",resbuf[0]);
+				//if(!(resbuf[0]&0x2)) printf("Possible error %02x\n",resbuf[0]);
 			}
 			fcrc |= (sendsize<<16);
 			//printf("ROM done! CRC: %08x\n", fcrc);
@@ -305,17 +327,12 @@ int main(int argc, char *argv[])
 						int gbasize = 0;
 						while(gbasize == 0)
 							gbasize = __builtin_bswap32(recvsafe());
-						sendsafe(0); //got gbasize
-						usleep(5000); //wait for it to set next val
+						sendsafe_wait(0); //got gbasize
 						u32 savesize = __builtin_bswap32(recvsafe());
-						sendsafe(0); //got savesize
-						usleep(5000); //wait for it to set next val
+						sendsafe_wait(0); //got savesize
 						if(gbasize == -1) 
 						{
-							printf("ERROR: No (Valid) GBA Card inserted!\n");
-							VIDEO_WaitVSync();
-							VIDEO_WaitVSync();
-							sleep(2);
+							warnError("ERROR: No (Valid) GBA Card inserted!\n");
 							continue;
 						}
 						//get rom header
@@ -383,9 +400,7 @@ int main(int argc, char *argv[])
 							{
 								fclose(f);
 								command = 0;
-								printf("ERROR: Game already dumped!\n");
-								VIDEO_WaitVSync();
-								sleep(2);
+								warnError("ERROR: Game already dumped!\n");
 							}
 						}
 						else if(command == 2)
@@ -395,9 +410,7 @@ int main(int argc, char *argv[])
 							{
 								fclose(f);
 								command = 0;
-								printf("ERROR: Save already backed up!\n");
-								VIDEO_WaitVSync();
-								sleep(2);
+								warnError("ERROR: Save already backed up!\n");
 							}
 						}
 						else if(command == 3)
@@ -411,9 +424,7 @@ int main(int argc, char *argv[])
 								if(readsize != savesize)
 								{
 									command = 0;
-									printf("ERROR: Save has the wrong size, aborting restore!\n");
-									VIDEO_WaitVSync();
-									sleep(2);
+									warnError("ERROR: Save has the wrong size, aborting restore!\n");
 								}
 								else
 								{
@@ -425,34 +436,20 @@ int main(int argc, char *argv[])
 							else
 							{
 								command = 0;
-								printf("ERROR: No Save to restore!\n");
-								VIDEO_WaitVSync();
-								sleep(2);
+								warnError("ERROR: No Save to restore!\n");
 							}
 						}
-						sendsafe(command);
-						usleep(5000); //wait for it to set next val
+						sendsafe_wait(command);
 						if(command == 0)
 							continue;
 						else if(command == 1)
 						{
 							//create base file with size
-							printf("Creating file...\n");
-							int fd = open(gamename, O_WRONLY|O_CREAT);
-							if(fd >= 0)
-							{
-								ftruncate(fd, gbasize);
-								close(fd);
-							}
+							printf("Preparing file...\n");
+							createFile(gamename,gbasize);
 							FILE *f = fopen(gamename,"wb");
 							if(!f)
-							{
-								printf("ERROR: Could not create file! Exit...\n");
-								VIDEO_WaitVSync();
-								VIDEO_WaitVSync();
-								sleep(5);
-								exit(0);
-							}
+								fatalError("ERROR: Could not create file! Exit...");
 							printf("Dumping...\n");
 							u32 bytes_read = 0;
 							while(gbasize > 0)
@@ -464,10 +461,7 @@ int main(int argc, char *argv[])
 									*(vu32*)(testdump+j) = recvfast();
 									bytes_read+=4;
 									if((bytes_read&0xFFFF) == 0)
-									{
 										printf("\r%02.02f MB done",(float)(bytes_read/1024)/1024.f);
-										VIDEO_WaitVSync();
-									}
 								}
 								fwrite(testdump,toread,1,f);
 								gbasize -= toread;
@@ -479,22 +473,18 @@ int main(int argc, char *argv[])
 						}
 						else if(command == 2)
 						{
+							//create base file with size
+							printf("Preparing file...\n");
+							createFile(savename,savesize);
 							FILE *f = fopen(savename,"wb");
 							if(!f)
-							{
-								printf("ERROR: Could not create file! Exit...\n");
-								VIDEO_WaitVSync();
-								VIDEO_WaitVSync();
-								sleep(5);
-								exit(0);
-							}
+								fatalError("ERROR: Could not create file! Exit...");
 							printf("Waiting for GBA\n");
 							VIDEO_WaitVSync();
 							u32 readval = 0;
 							while(readval != savesize)
 								readval = __builtin_bswap32(recvsafe());
-							sendsafe(0); //got savesize
-							usleep(5000); //wait for it to set next val
+							sendsafe_wait(0); //got savesize
 							printf("Receiving...\n");
 							for(i = 0; i < savesize; i+=4)
 								*(vu32*)(testdump+i) = recvsafe();
@@ -517,7 +507,7 @@ int main(int argc, char *argv[])
 							while(recvsafe() != 0)
 								VIDEO_WaitVSync();
 							printf("Save restored!\n");
-							sendsafe(0);
+							sendsafe_wait(0);
 							sleep(5);
 						}
 					}

@@ -4,92 +4,18 @@
 	routine with a pointer to an appropriately sized array of data to
 	be read from or written to the cartridge.
 	Data types are from wintermute's gba_types.h libgba library.
+	Original file from SendSave by Chishm
 */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-//---------------------------------------------------------------------------------
-#ifndef	_gba_types_h_
-#define	_gba_types_h_
-//---------------------------------------------------------------------------------
+#include <gba_dma.h>
 
-//---------------------------------------------------------------------------------
-// Data	types
-//---------------------------------------------------------------------------------
-/** Unsigned 8 bit value
-
-*/
-typedef	unsigned char			u8;
-/** Unsigned 16 bit value
-
-*/
-typedef	unsigned short int		u16;
-/** Unsigned 32 bit value
-
-*/
-typedef	unsigned int			u32;
-
-/** signed 8 bit value
-
-*/
-typedef	signed char				s8;
-/** Signed 16 bit value
-
-*/
-typedef	signed short int		s16;
-/** Signed 32 bit value
-
-*/
-typedef	signed int				s32;
-
-/** Unsigned volatile 8 bit value
-
-*/
-typedef	volatile u8				vu8;
-/** Unsigned volatile 16 bit value
-
-*/
-typedef	volatile u16			vu16;
-/** Unsigned volatile 32 bit value
-
-*/
-typedef	volatile u32			vu32;
-
-/** Unsigned volatile 8 bit value
-
-*/
-typedef	volatile s8				vs8;
-/** Signed volatile 16 bit value
-
-*/
-typedef	volatile s16			vs16;
-/** Signed volatile 32 bit value
-
-*/
-typedef	volatile s32			vs32;
-
-#ifndef __cplusplus
-/** C++ compatible bool for C
-
-*/
-typedef enum { false, true } bool;
-#endif
-
-//---------------------------------------------------------------------------------
-#endif // data types
-//---------------------------------------------------------------------------------
-
-
-#define EEPROM_ADDRESS (volatile u16*)0xDFFFF00 
-#define SRAM_ADDRESS (volatile u16*)0x0E000000
-#define FLASH_1M_ADDRESS (volatile u16*)0x09FE0000
-#define REG_EEPROM  (*(volatile u16*)0xDFFFF00) 
-#define REG_DM3SAD  (*(volatile u32*)0x40000D4) 
-#define REG_DM3DAD  (*(volatile u32*)0x40000D8) 
-#define REG_DM3CNT  (*(volatile u32*)0x40000DC)
-#define REG_DM3CNT_H (*(volatile u16*)0x40000DE)
-#define REG_WAITCNT (*(volatile u16*)0x4000204)
+#define EEPROM_ADDRESS (0xDFFFF00)
+#define REG_EEPROM *(vu16 *)(EEPROM_ADDRESS)
+#define	REG_DMA3CNT_H *(vu16 *)(REG_BASE + 0x0de)
+#define	REG_WAITCNT *(vu16 *)(REG_BASE + 0x204)
 
 //-----------------------------------------------------------------------
 // Common EEPROM Routines
@@ -98,19 +24,19 @@ typedef enum { false, true } bool;
 void EEPROM_SendPacket( u16* packet, int size ) 
 { 
    REG_WAITCNT = (REG_WAITCNT & 0xF8FF) | 0x0300;
-   REG_DM3SAD = (u32)packet; 
-   REG_DM3DAD = (u32)EEPROM_ADDRESS; 
-   REG_DM3CNT = 0x80000000 + size; 
-   while((REG_DM3CNT_H & 0x8000) != 0) ;
+   REG_DMA3SAD = (u32)packet; 
+   REG_DMA3DAD = EEPROM_ADDRESS; 
+   REG_DMA3CNT = 0x80000000 + size; 
+   while((REG_DMA3CNT_H & 0x8000) != 0) ;
 } 
 
 void EEPROM_ReceivePacket( u16* packet, int size ) 
 { 
    REG_WAITCNT = (REG_WAITCNT & 0xF8FF) | 0x0300;
-   REG_DM3SAD = (u32)EEPROM_ADDRESS; 
-   REG_DM3DAD = (u32)packet; 
-   REG_DM3CNT = 0x80000000 + size; 
-   while((REG_DM3CNT_H & 0x8000) != 0) ;
+   REG_DMA3SAD = EEPROM_ADDRESS; 
+   REG_DMA3DAD = (u32)packet; 
+   REG_DMA3CNT = 0x80000000 + size; 
+   while((REG_DMA3CNT_H & 0x8000) != 0) ;
 } 
 
 //-----------------------------------------------------------------------
@@ -213,9 +139,6 @@ void GetSave_EEPROM_512B(u8* data)
 	volatile u8 x;
 	u32 sleep;
 
-	// Set up waitstates for EEPROM access etc. 
-	*(volatile unsigned short *)0x04000204 = 0x4317; 
-
     for (x=0;x<64;++x){
 		EEPROM_Read_512B(x,&data[x*8]);
 		for(sleep=0;sleep<512000;sleep++);
@@ -228,9 +151,6 @@ void PutSave_EEPROM_512B(u8* data)
 {
 	volatile u8 x;
 	u32 sleep;
-
-	// Set up waitstates for EEPROM access etc. 
-	*(volatile unsigned short *)0x04000204 = 0x4317; 
 
     for (x=0;x<64;x++){ 
 		EEPROM_Write_512B(x,&data[x*8]);
@@ -354,9 +274,6 @@ void GetSave_EEPROM_8KB(u8* data)
 	volatile u16 x;
 	u32 sleep;
 
-	// Set up waitstates for EEPROM access etc. 
-	*(volatile unsigned short *)0x04000204 = 0x4317; 
-
     for (x=0;x<1024;x++){ 
 		EEPROM_Read_8KB(x,&data[x*8]);
 		for(sleep=0;sleep<512000;sleep++);
@@ -370,9 +287,6 @@ void PutSave_EEPROM_8KB(u8* data)
 {
 	volatile u16 x;
 	u32 sleep;
-
-	// Set up waitstates for EEPROM access etc. 
-	*(volatile unsigned short *)0x04000204 = 0x4317; 
 
     for (x=0;x<1024;x++){ 
 		EEPROM_Write_8KB(x,&data[x*8]);

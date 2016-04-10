@@ -1,13 +1,18 @@
-
-#include <gba_console.h>
-#include <gba_video.h>
-#include <gba_interrupt.h>
-#include <gba_systemcalls.h>
-#include <gba_input.h>
-#include <gba_sio.h>
+/*
+ * Copyright (C) 2016 FIX94
+ *
+ * This software may be modified and distributed under the terms
+ * of the MIT license.  See the LICENSE file for details.
+ */
+#include <gba.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include "libSave.h"
+
+#define	REG_WAITCNT *(vu16 *)(REG_BASE + 0x204)
+#define JOY_WRITE 2
+#define JOY_READ 4
+#define JOY_RW 6
 
 u8 save_data[0x20000] __attribute__ ((section (".sbss")));
 
@@ -33,8 +38,7 @@ s32 getGameSize(void)
 	}
 	return i;
 }
-#define JOY_WRITE 2
-#define JOY_READ 4
+
 //---------------------------------------------------------------------------------
 // Program entry point
 //---------------------------------------------------------------------------------
@@ -52,31 +56,32 @@ int main(void) {
 	// ansi escape sequence to set print co-ordinates
 	// /x1b[line;columnH
 	u32 i;
-	iprintf("\x1b[9;10HROM Dumper\n");
-	iprintf("\x1b[10;5HPlease look at the TV\n");
-	REG_HS_CTRL |= (JOY_WRITE|JOY_READ);
-	u32 prevIrqMask = REG_IME;
+	iprintf("\x1b[9;2HGBA Link Cable Dumper v1.3\n");
+	iprintf("\x1b[10;4HPlease look at the TV\n");
+	// disable this, needs power
+	SNDSTAT = 0;
+	SNDBIAS = 0;
+	// Set up waitstates for EEPROM access etc. 
+	REG_WAITCNT = 0x0317;
+	//clear out previous messages
+	REG_HS_CTRL |= JOY_RW;
 	while (1) {
 		if((REG_HS_CTRL&JOY_READ))
 		{
-			irqDisable(IRQ_VBLANK);
-			REG_IME = 0;
-			REG_HS_CTRL |= (JOY_WRITE|JOY_READ);
+			REG_HS_CTRL |= JOY_RW;
 			s32 gamesize = getGameSize();
 			u32 savesize = SaveSize(save_data,gamesize);
 			REG_JOYTR = gamesize;
 			//wait for a cmd receive for safety
 			while((REG_HS_CTRL&JOY_WRITE) == 0) ;
-			REG_HS_CTRL |= (JOY_WRITE|JOY_READ);
+			REG_HS_CTRL |= JOY_RW;
 			REG_JOYTR = savesize;
 			//wait for a cmd receive for safety
 			while((REG_HS_CTRL&JOY_WRITE) == 0) ;
-			REG_HS_CTRL |= (JOY_WRITE|JOY_READ);
+			REG_HS_CTRL |= JOY_RW;
 			if(gamesize == -1)
 			{
 				REG_JOYTR = 0;
-				REG_IME = prevIrqMask;
-				irqEnable(IRQ_VBLANK);
 				continue; //nothing to read
 			}
 			//game in, send header
@@ -84,32 +89,38 @@ int main(void) {
 			{
 				REG_JOYTR = *(vu32*)(0x08000000+i);
 				while((REG_HS_CTRL&JOY_READ) == 0) ;
-				REG_HS_CTRL |= (JOY_WRITE|JOY_READ);
+				REG_HS_CTRL |= JOY_RW;
 			}
 			REG_JOYTR = 0;
 			//wait for other side to choose
 			while((REG_HS_CTRL&JOY_WRITE) == 0) ;
-			REG_HS_CTRL |= (JOY_WRITE|JOY_READ);
+			REG_HS_CTRL |= JOY_RW;
 			u32 choseval = REG_JOYRE;
 			if(choseval == 0)
 			{
 				REG_JOYTR = 0;
-				REG_IME = prevIrqMask;
-				irqEnable(IRQ_VBLANK);
 				continue; //nothing to read
 			}
 			else if(choseval == 1)
 			{
+				//disable interrupts
+				u32 prevIrqMask = REG_IME;
+				REG_IME = 0;
 				//dump the game
 				for(i = 0; i < gamesize; i+=4)
 				{
 					REG_JOYTR = *(vu32*)(0x08000000+i);
 					while((REG_HS_CTRL&JOY_READ) == 0) ;
-					REG_HS_CTRL |= (JOY_WRITE|JOY_READ);
+					REG_HS_CTRL |= JOY_RW;
 				}
+				//restore interrupts
+				REG_IME = prevIrqMask;
 			}
 			else if(choseval == 2)
 			{
+				//disable interrupts
+				u32 prevIrqMask = REG_IME;
+				REG_IME = 0;
 				//backup save
 				switch (savesize){
 				case 0x200:
@@ -130,16 +141,19 @@ int main(void) {
 				default:
 					break;
 				}
+				//restore interrupts
+				REG_IME = prevIrqMask;
+				//say gc side we read it
 				REG_JOYTR = savesize;
 				//wait for a cmd receive for safety
 				while((REG_HS_CTRL&JOY_WRITE) == 0) ;
-				REG_HS_CTRL |= (JOY_WRITE|JOY_READ);
+				REG_HS_CTRL |= JOY_RW;
 				//send the save
 				for(i = 0; i < savesize; i+=4)
 				{
 					REG_JOYTR = *(vu32*)(save_data+i);
 					while((REG_HS_CTRL&JOY_READ) == 0) ;
-					REG_HS_CTRL |= (JOY_WRITE|JOY_READ);
+					REG_HS_CTRL |= JOY_RW;
 				}
 			}
 			else if(choseval == 3)
@@ -149,9 +163,12 @@ int main(void) {
 				for(i = 0; i < savesize; i+=4)
 				{
 					while((REG_HS_CTRL&JOY_WRITE) == 0) ;
-					REG_HS_CTRL |= (JOY_WRITE|JOY_READ);
+					REG_HS_CTRL |= JOY_RW;
 					*(vu32*)(save_data+i) = REG_JOYRE;
 				}
+				//disable interrupts
+				u32 prevIrqMask = REG_IME;
+				REG_IME = 0;
 				//write it
 				switch (savesize){
 				case 0x200:
@@ -172,14 +189,15 @@ int main(void) {
 				default:
 					break;
 				}
+				//restore interrupts
+				REG_IME = prevIrqMask;
+				//say gc side we're done
 				REG_JOYTR = 0;
 				//wait for a cmd receive for safety
 				while((REG_HS_CTRL&JOY_WRITE) == 0) ;
-				REG_HS_CTRL |= (JOY_WRITE|JOY_READ);
+				REG_HS_CTRL |= JOY_RW;
 			}
 			REG_JOYTR = 0;
-			REG_IME = prevIrqMask;
-			irqEnable(IRQ_VBLANK);
 		}
 		Halt();
 	}

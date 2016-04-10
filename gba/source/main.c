@@ -56,7 +56,7 @@ int main(void) {
 	// ansi escape sequence to set print co-ordinates
 	// /x1b[line;columnH
 	u32 i;
-	iprintf("\x1b[9;2HGBA Link Cable Dumper v1.3\n");
+	iprintf("\x1b[9;2HGBA Link Cable Dumper v1.4\n");
 	iprintf("\x1b[10;4HPlease look at the TV\n");
 	// disable this, needs power
 	SNDSTAT = 0;
@@ -66,7 +66,7 @@ int main(void) {
 	//clear out previous messages
 	REG_HS_CTRL |= JOY_RW;
 	while (1) {
-		if((REG_HS_CTRL&JOY_READ))
+		if(REG_HS_CTRL&JOY_READ)
 		{
 			REG_HS_CTRL |= JOY_RW;
 			s32 gamesize = getGameSize();
@@ -196,6 +196,32 @@ int main(void) {
 				//wait for a cmd receive for safety
 				while((REG_HS_CTRL&JOY_WRITE) == 0) ;
 				REG_HS_CTRL |= JOY_RW;
+			}
+			REG_JOYTR = 0;
+		}
+		else if(REG_HS_CTRL&JOY_WRITE)
+		{
+			REG_HS_CTRL |= JOY_RW;
+			u32 choseval = REG_JOYRE;
+			if(choseval == 4)
+			{
+				//disable interrupts
+				u32 prevIrqMask = REG_IME;
+				REG_IME = 0;
+				//dump BIOS
+				for (i = 0; i < 0x4000; i+=4)
+				{
+					// the lower bits are inaccurate, so just get it four times :)
+					u32 a = MidiKey2Freq((WaveData *)(i-4), 180-12, 0) * 2;
+					u32 b = MidiKey2Freq((WaveData *)(i-3), 180-12, 0) * 2;
+					u32 c = MidiKey2Freq((WaveData *)(i-2), 180-12, 0) * 2;
+					u32 d = MidiKey2Freq((WaveData *)(i-1), 180-12, 0) * 2;
+					REG_JOYTR = ((a>>24<<24) | (d>>24<<16) | (c>>24<<8) | (b>>24));
+					while((REG_HS_CTRL&JOY_READ) == 0) ;
+					REG_HS_CTRL |= JOY_RW;
+				}
+				//restore interrupts
+				REG_IME = prevIrqMask;
 			}
 			REG_JOYTR = 0;
 		}

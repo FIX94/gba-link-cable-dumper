@@ -23,8 +23,9 @@ void printmain()
 {
 	printf("\x1b[2J");
 	printf("\x1b[37m");
-	printf("GBA Link Cable Dumper v1.3 by FIX94\n");
+	printf("GBA Link Cable Dumper v1.4 by FIX94\n");
 	printf("Save Support based on SendSave by Chishm\n");
+	printf("GBA BIOS Dumper by Dark Fader\n \n");
 }
 
 u8 *resbuf,*cmdbuf;
@@ -312,7 +313,8 @@ int main(int argc, char *argv[])
 			while(1)
 			{
 				printmain();
-				printf("Press A once you have a GBA Game inserted.\n \n");
+				printf("Press A once you have a GBA Game inserted.\n");
+				printf("Press Y to backup the GBA BIOS.\n \n");
 				PAD_ScanPads();
 				VIDEO_WaitVSync();
 				u32 btns = PAD_ButtonsDown(0);
@@ -510,6 +512,41 @@ int main(int argc, char *argv[])
 							sendsafe_wait(0);
 							sleep(5);
 						}
+					}
+				}
+				else if(btns&PAD_BUTTON_Y)
+				{
+					char biosname[64];
+					sprintf(biosname,"/dumps/gba_bios.bin");
+					FILE *f = fopen(biosname,"rb");
+					if(f)
+					{
+						fclose(f);
+						warnError("ERROR: BIOS already backed up!\n");
+					}
+					else
+					{
+						//create base file with size
+						printf("Preparing file...\n");
+						createFile(biosname,0x4000);
+						f = fopen(biosname,"wb");
+						if(!f)
+							fatalError("ERROR: Could not create file! Exit...");
+						//send over bios dump command
+						sendsafe_wait(4);
+						//the gba might still be in a loop itself
+						VIDEO_WaitVSync(); VIDEO_WaitVSync();
+						VIDEO_WaitVSync(); VIDEO_WaitVSync();
+						VIDEO_WaitVSync(); VIDEO_WaitVSync();
+						//lets go!
+						printf("Dumping...\n");
+						for(i = 0; i < 0x4000; i+=4)
+							*(vu32*)(testdump+i) = recvsafe();
+						fwrite(testdump,0x4000,1,f);
+						printf("Closing file\n");
+						fclose(f);
+						printf("BIOS dumped!\n");
+						sleep(5);
 					}
 				}
 			}

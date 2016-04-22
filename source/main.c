@@ -16,6 +16,10 @@
 #include <dirent.h>
 #include <fat.h>
 
+//from my tests 50us seems to be the lowest
+//safe si transfer delay in between calls
+#define SI_TRANS_DELAY 50
+
 extern u8 gba_mb_gba[];
 extern u32 gba_mb_gba_size;
 
@@ -23,25 +27,12 @@ void printmain()
 {
 	printf("\x1b[2J");
 	printf("\x1b[37m");
-	printf("GBA Link Cable Dumper v1.4 by FIX94\n");
+	printf("GBA Link Cable Dumper v1.5 by FIX94\n");
 	printf("Save Support based on SendSave by Chishm\n");
 	printf("GBA BIOS Dumper by Dark Fader\n \n");
 }
 
 u8 *resbuf,*cmdbuf;
-volatile u16 pads = 0;
-volatile bool ctrlerr = false;
-void ctrlcb(s32 chan, u32 ret)
-{
-	if(ret)
-	{
-		ctrlerr = true;
-		return;
-	}
-	//just call us again
-	pads = (~((resbuf[1]<<8)|resbuf[0]))&0x3FF;
-	SI_Transfer(1,cmdbuf,1,resbuf,5,ctrlcb,350);
-}
 
 volatile u32 transval = 0;
 void transcb(s32 chan, u32 ret)
@@ -72,18 +63,37 @@ unsigned int docrc(u32 crc, u32 val)
 	return crc;
 }
 
-static inline void wait_for_transfer()
-{
-	//350 is REALLY pushing it already, cant go further
-	do{ usleep(350); }while(transval == 0);
-}
-
 void endproc()
 {
 	printf("Start pressed, exit\n");
 	VIDEO_WaitVSync();
 	VIDEO_WaitVSync();
 	exit(0);
+}
+void fixFName(char *str)
+{
+	u8 i = 0;
+	for(i = 0; i < strlen(str); ++i)
+	{
+		if(str[i] < 0x20 || str[i] > 0x7F)
+			str[i] = '_';
+		else switch(str[i])
+		{
+			case '\\':
+			case '/':
+			case ':':
+			case '*':
+			case '?':
+			case '\"':
+			case '<':
+			case '>':
+			case '|':
+				str[i] = '_';
+				break;
+			default:
+				break;
+		}
+	}
 }
 unsigned int calckey(unsigned int size)
 {
@@ -122,48 +132,33 @@ void doreset()
 {
 	cmdbuf[0] = 0xFF; //reset
 	transval = 0;
-	SI_Transfer(1,cmdbuf,1,resbuf,3,transcb,0);
-	wait_for_transfer();
+	SI_Transfer(1,cmdbuf,1,resbuf,3,transcb,SI_TRANS_DELAY);
+	while(transval == 0) ;
 }
 void getstatus()
 {
 	cmdbuf[0] = 0; //status
 	transval = 0;
-	SI_Transfer(1,cmdbuf,1,resbuf,3,transcb,0);
-	wait_for_transfer();
+	SI_Transfer(1,cmdbuf,1,resbuf,3,transcb,SI_TRANS_DELAY);
+	while(transval == 0) ;
 }
-u32 recvsafe()
+u32 recv()
 {
 	memset(resbuf,0,32);
 	cmdbuf[0]=0x14; //read
 	transval = 0;
-	SI_Transfer(1,cmdbuf,1,resbuf,5,transcb,0);
-	wait_for_transfer();
+	SI_Transfer(1,cmdbuf,1,resbuf,5,transcb,SI_TRANS_DELAY);
+	while(transval == 0) ;
 	return *(vu32*)resbuf;
 }
-void sendsafe(u32 msg)
+void send(u32 msg)
 {
 	cmdbuf[0]=0x15;cmdbuf[1]=(msg>>0)&0xFF;cmdbuf[2]=(msg>>8)&0xFF;
 	cmdbuf[3]=(msg>>16)&0xFF;cmdbuf[4]=(msg>>24)&0xFF;
 	transval = 0;
 	resbuf[0] = 0;
-	SI_Transfer(1,cmdbuf,5,resbuf,1,transcb,0);
-	wait_for_transfer();
-}
-void sendsafe_wait(u32 msg)
-{
-	sendsafe(msg);
-	//wait for GBA
-	usleep(5000);
-}
-u32 recvfast()
-{
-	cmdbuf[0]=0x14; //read
-	transval = 0;
-	SI_Transfer(1,cmdbuf,1,resbuf,5,transcb,0);
-	usleep(275);
+	SI_Transfer(1,cmdbuf,5,resbuf,1,transcb,SI_TRANS_DELAY);
 	while(transval == 0) ;
-	return *(vu32*)resbuf;
 }
 bool dirExists(const char *path)
 {
@@ -240,7 +235,6 @@ int main(int argc, char *argv[])
 		printmain();
 		printf("Waiting for a GBA in port 2...\n");
 		resval = 0;
-		ctrlerr = false;
 
 		SI_GetTypeAsync(1,acb);
 		while(1)
@@ -274,17 +268,14 @@ int main(int argc, char *argv[])
 			unsigned int ourkey = calckey(sendsize);
 			//printf("Our Key: %08x\n", ourkey);
 			//get current sessionkey
-			u32 sessionkeyraw = recvsafe();
+			u32 sessionkeyraw = recv();
 			u32 sessionkey = __builtin_bswap32(sessionkeyraw^0x7365646F);
 			//send over our own key
-			sendsafe(__builtin_bswap32(ourkey));
+			send(__builtin_bswap32(ourkey));
 			unsigned int fcrc = 0x15a0;
 			//send over gba header
 			for(i = 0; i < 0xC0; i+=4)
-			{
-				sendsafe(__builtin_bswap32(*(vu32*)(gba_mb_gba+i)));
-				//if(!(resbuf[0]&0x2)) printf("Possible error %02x\n",resbuf[0]);
-			}
+				send(__builtin_bswap32(*(vu32*)(gba_mb_gba+i)));
 			//printf("Header done! Sending ROM...\n");
 			for(i = 0xC0; i < sendsize; i+=4)
 			{
@@ -294,8 +285,7 @@ int main(int argc, char *argv[])
 				enc^=sessionkey;
 				enc^=((~(i+(0x20<<20)))+1);
 				enc^=0x20796220;
-				sendsafe(enc);
-				//if(!(resbuf[0]&0x2)) printf("Possible error %02x\n",resbuf[0]);
+				send(enc);
 			}
 			fcrc |= (sendsize<<16);
 			//printf("ROM done! CRC: %08x\n", fcrc);
@@ -304,9 +294,9 @@ int main(int argc, char *argv[])
 			fcrc^=sessionkey;
 			fcrc^=((~(i+(0x20<<20)))+1);
 			fcrc^=0x20796220;
-			sendsafe(fcrc);
+			send(fcrc);
 			//get crc back (unused)
-			recvsafe();
+			recv();
 			printf("Done!\n");
 			sleep(2);
 			//hm
@@ -322,16 +312,16 @@ int main(int argc, char *argv[])
 					endproc();
 				else if(btns&PAD_BUTTON_A)
 				{
-					if(recvsafe() == 0) //ready
+					if(recv() == 0) //ready
 					{
 						printf("Waiting for GBA\n");
 						VIDEO_WaitVSync();
 						int gbasize = 0;
 						while(gbasize == 0)
-							gbasize = __builtin_bswap32(recvsafe());
-						sendsafe_wait(0); //got gbasize
-						u32 savesize = __builtin_bswap32(recvsafe());
-						sendsafe_wait(0); //got savesize
+							gbasize = __builtin_bswap32(recv());
+						send(0); //got gbasize
+						u32 savesize = __builtin_bswap32(recv());
+						send(0); //got savesize
 						if(gbasize == -1) 
 						{
 							warnError("ERROR: No (Valid) GBA Card inserted!\n");
@@ -339,7 +329,7 @@ int main(int argc, char *argv[])
 						}
 						//get rom header
 						for(i = 0; i < 0xC0; i+=4)
-							*(vu32*)(testdump+i) = recvfast();
+							*(vu32*)(testdump+i) = recv();
 						//print out all the info from the  game
 						printf("Game Name: %.12s\n",(char*)(testdump+0xA0));
 						printf("Game ID: %.4s\n",(char*)(testdump+0xAC));
@@ -353,9 +343,11 @@ int main(int argc, char *argv[])
 						char gamename[64];
 						sprintf(gamename,"/dumps/%.12s [%.4s%.2s].gba",
 							(char*)(testdump+0xA0),(char*)(testdump+0xAC),(char*)(testdump+0xB0));
+						fixFName(gamename+7); //fix name behind "/dumps/"
 						char savename[64];
 						sprintf(savename,"/dumps/%.12s [%.4s%.2s].sav",
 							(char*)(testdump+0xA0),(char*)(testdump+0xAC),(char*)(testdump+0xB0));
+						fixFName(savename+7); //fix name behind "/dumps/"
 						//let the user choose the option
 						printf("Press A to dump this game, it will take about %i minutes.\n",gbasize/1024/1024*3/2);
 						printf("Press B if you want to cancel dumping this game.\n");
@@ -441,7 +433,9 @@ int main(int argc, char *argv[])
 								warnError("ERROR: No Save to restore!\n");
 							}
 						}
-						sendsafe_wait(command);
+						send(command);
+						//let gba prepare
+						sleep(1);
 						if(command == 0)
 							continue;
 						else if(command == 1)
@@ -460,7 +454,7 @@ int main(int argc, char *argv[])
 								int j;
 								for(j = 0; j < toread; j+=4)
 								{
-									*(vu32*)(testdump+j) = recvfast();
+									*(vu32*)(testdump+j) = recv();
 									bytes_read+=4;
 									if((bytes_read&0xFFFF) == 0)
 										printf("\r%02.02f MB done",(float)(bytes_read/1024)/1024.f);
@@ -485,11 +479,11 @@ int main(int argc, char *argv[])
 							VIDEO_WaitVSync();
 							u32 readval = 0;
 							while(readval != savesize)
-								readval = __builtin_bswap32(recvsafe());
-							sendsafe_wait(0); //got savesize
+								readval = __builtin_bswap32(recv());
+							send(0); //got savesize
 							printf("Receiving...\n");
 							for(i = 0; i < savesize; i+=4)
-								*(vu32*)(testdump+i) = recvsafe();
+								*(vu32*)(testdump+i) = recv();
 							printf("Writing save...\n");
 							fwrite(testdump,savesize,1,f);
 							fclose(f);
@@ -502,22 +496,21 @@ int main(int argc, char *argv[])
 							VIDEO_WaitVSync();
 							u32 readval = 0;
 							while(readval != savesize)
-								readval = __builtin_bswap32(recvsafe());
+								readval = __builtin_bswap32(recv());
 							for(i = 0; i < savesize; i+=4)
-								sendsafe(__builtin_bswap32(*(vu32*)(testdump+i)));
+								send(__builtin_bswap32(*(vu32*)(testdump+i)));
 							printf("Waiting for GBA\n");
-							while(recvsafe() != 0)
+							while(recv() != 0)
 								VIDEO_WaitVSync();
 							printf("Save restored!\n");
-							sendsafe_wait(0);
+							send(0);
 							sleep(5);
 						}
 					}
 				}
 				else if(btns&PAD_BUTTON_Y)
 				{
-					char biosname[64];
-					sprintf(biosname,"/dumps/gba_bios.bin");
+					const char *biosname = "/dumps/gba_bios.bin";
 					FILE *f = fopen(biosname,"rb");
 					if(f)
 					{
@@ -533,15 +526,13 @@ int main(int argc, char *argv[])
 						if(!f)
 							fatalError("ERROR: Could not create file! Exit...");
 						//send over bios dump command
-						sendsafe_wait(4);
+						send(4);
 						//the gba might still be in a loop itself
-						VIDEO_WaitVSync(); VIDEO_WaitVSync();
-						VIDEO_WaitVSync(); VIDEO_WaitVSync();
-						VIDEO_WaitVSync(); VIDEO_WaitVSync();
+						sleep(1);
 						//lets go!
 						printf("Dumping...\n");
 						for(i = 0; i < 0x4000; i+=4)
-							*(vu32*)(testdump+i) = recvsafe();
+							*(vu32*)(testdump+i) = recv();
 						fwrite(testdump,0x4000,1,f);
 						printf("Closing file\n");
 						fclose(f);

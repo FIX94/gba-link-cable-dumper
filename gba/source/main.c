@@ -56,7 +56,7 @@ int main(void) {
 	// ansi escape sequence to set print co-ordinates
 	// /x1b[line;columnH
 	u32 i;
-	iprintf("\x1b[9;2HGBA Link Cable Dumper v1.4\n");
+	iprintf("\x1b[9;2HGBA Link Cable Dumper v1.5\n");
 	iprintf("\x1b[10;4HPlease look at the TV\n");
 	// disable this, needs power
 	SNDSTAT = 0;

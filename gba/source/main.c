@@ -56,7 +56,7 @@ int main(void) {
 	// ansi escape sequence to set print co-ordinates
 	// /x1b[line;columnH
 	u32 i;
-	iprintf("\x1b[9;2HGBA Link Cable Dumper v1.5\n");
+	iprintf("\x1b[9;2HGBA Link Cable Dumper v1.6\n");
 	iprintf("\x1b[10;4HPlease look at the TV\n");
 	// disable this, needs power
 	SNDSTAT = 0;
@@ -156,15 +156,24 @@ int main(void) {
 					REG_HS_CTRL |= JOY_RW;
 				}
 			}
-			else if(choseval == 3)
+			else if(choseval == 3 || choseval == 4)
 			{
 				REG_JOYTR = savesize;
-				//receive the save
-				for(i = 0; i < savesize; i+=4)
+				if(choseval == 3)
 				{
-					while((REG_HS_CTRL&JOY_WRITE) == 0) ;
-					REG_HS_CTRL |= JOY_RW;
-					*(vu32*)(save_data+i) = REG_JOYRE;
+					//receive the save
+					for(i = 0; i < savesize; i+=4)
+					{
+						while((REG_HS_CTRL&JOY_WRITE) == 0) ;
+						REG_HS_CTRL |= JOY_RW;
+						*(vu32*)(save_data+i) = REG_JOYRE;
+					}
+				}
+				else
+				{
+					//clear the save
+					for(i = 0; i < savesize; i+=4)
+						*(vu32*)(save_data+i) = 0;
 				}
 				//disable interrupts
 				u32 prevIrqMask = REG_IME;
@@ -203,7 +212,7 @@ int main(void) {
 		{
 			REG_HS_CTRL |= JOY_RW;
 			u32 choseval = REG_JOYRE;
-			if(choseval == 4)
+			if(choseval == 5)
 			{
 				//disable interrupts
 				u32 prevIrqMask = REG_IME;

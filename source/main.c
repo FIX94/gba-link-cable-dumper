@@ -27,7 +27,7 @@ void printmain()
 {
 	printf("\x1b[2J");
 	printf("\x1b[37m");
-	printf("GBA Link Cable Dumper v1.5 by FIX94\n");
+	printf("GBA Link Cable Dumper v1.6 by FIX94\n");
 	printf("Save Support based on SendSave by Chishm\n");
 	printf("GBA BIOS Dumper by Dark Fader\n \n");
 }
@@ -354,7 +354,8 @@ int main(int argc, char *argv[])
 						if(savesize > 0)
 						{
 							printf("Press Y to backup this save file.\n");
-							printf("Press X to restore this save file.\n\n");
+							printf("Press X to restore this save file.\n");
+							printf("Press Z to clear the save file on the GBA Cartridge.\n\n");
 						}
 						else
 							printf("\n");
@@ -383,6 +384,11 @@ int main(int argc, char *argv[])
 								else if(btns&PAD_BUTTON_X)
 								{
 									command = 3;
+									break;
+								}
+								else if(btns&PAD_TRIGGER_Z)
+								{
+									command = 4;
 									break;
 								}
 							}
@@ -490,19 +496,22 @@ int main(int argc, char *argv[])
 							printf("Save backed up!\n");
 							sleep(5);
 						}
-						else if(command == 3)
+						else if(command == 3 || command == 4)
 						{
-							printf("Sending save\n");
-							VIDEO_WaitVSync();
 							u32 readval = 0;
 							while(readval != savesize)
 								readval = __builtin_bswap32(recv());
-							for(i = 0; i < savesize; i+=4)
-								send(__builtin_bswap32(*(vu32*)(testdump+i)));
+							if(command == 3)
+							{
+								printf("Sending save\n");
+								VIDEO_WaitVSync();
+								for(i = 0; i < savesize; i+=4)
+									send(__builtin_bswap32(*(vu32*)(testdump+i)));
+							}
 							printf("Waiting for GBA\n");
 							while(recv() != 0)
 								VIDEO_WaitVSync();
-							printf("Save restored!\n");
+							printf(command == 3 ? "Save restored!\n" : "Save cleared!\n");
 							send(0);
 							sleep(5);
 						}
@@ -526,7 +535,7 @@ int main(int argc, char *argv[])
 						if(!f)
 							fatalError("ERROR: Could not create file! Exit...");
 						//send over bios dump command
-						send(4);
+						send(5);
 						//the gba might still be in a loop itself
 						sleep(1);
 						//lets go!

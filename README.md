@@ -17,3 +17,19 @@ You need [devkitPro](https://devkitpro.org/wiki/Getting_Started) with devkitARM 
 On macOS/Linux run `./build.sh` (or `make`), on Windows run `build.bat`.  
 `./build.sh gc` or `./build.sh wii` builds a single platform, `./build.sh clean` removes all build output.  
 The output is `linkcabledump_gc.dol` and `linkcabledump_wii.dol` in the repository root.
+
+# Source layout
+```
+common/protocol.h        commands and sizes shared by the GC/Wii side and the GBA payload
+gba/                     GBA multiboot payload (devkitARM), embedded into the dols
+source/main.c            entry point
+source/app/              screen flow, ties everything below together
+source/link/si_link      raw GBA link cable transfers over controller port 2
+source/link/multiboot    uploads the GBA payload
+source/link/gba_protocol high level commands (cart info, ROM/save/BIOS transfers)
+source/storage/storage   device mounting and file helpers
+source/storage/paths     output folder and file naming
+source/ui/ui.h           front end interface, implemented by ui_console.c
+source/ui/input.h        controller abstraction, implemented by input_pad.c
+```
+`link/` and `storage/` never draw to the screen or read the controller, so a graphical front end only needs to replace `ui_console.c`.

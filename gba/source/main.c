@@ -8,13 +8,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "libSave.h"
+#include "protocol.h"
 
 #define	REG_WAITCNT *(vu16 *)(REG_BASE + 0x204)
 #define JOY_WRITE 2
 #define JOY_READ 4
 #define JOY_RW 6
 
-u8 save_data[0x20000] __attribute__ ((section (".sbss")));
+u8 save_data[GBA_MAX_SAVE_SIZE] __attribute__ ((section (".sbss")));
 
 s32 getGameSize(void)
 {
@@ -56,7 +57,7 @@ int main(void) {
 	// ansi escape sequence to set print co-ordinates
 	// /x1b[line;columnH
 	u32 i;
-	iprintf("\x1b[9;2HGBA Link Cable Dumper v1.6\n");
+	iprintf("\x1b[9;2HGBA Link Cable Dumper " APP_VERSION "\n");
 	iprintf("\x1b[10;4HPlease look at the TV\n");
 	// disable this, needs power
 	SNDSTAT = 0;
@@ -85,7 +86,7 @@ int main(void) {
 				continue; //nothing to read
 			}
 			//game in, send header
-			for(i = 0; i < 0xC0; i+=4)
+			for(i = 0; i < GBA_HEADER_SIZE; i+=4)
 			{
 				REG_JOYTR = *(vu32*)(0x08000000+i);
 				while((REG_HS_CTRL&JOY_READ) == 0) ;
@@ -96,12 +97,12 @@ int main(void) {
 			while((REG_HS_CTRL&JOY_WRITE) == 0) ;
 			REG_HS_CTRL |= JOY_RW;
 			u32 choseval = REG_JOYRE;
-			if(choseval == 0)
+			if(choseval == GBA_CMD_NONE)
 			{
 				REG_JOYTR = 0;
 				continue; //nothing to read
 			}
-			else if(choseval == 1)
+			else if(choseval == GBA_CMD_DUMP_ROM)
 			{
 				//disable interrupts
 				u32 prevIrqMask = REG_IME;
@@ -116,7 +117,7 @@ int main(void) {
 				//restore interrupts
 				REG_IME = prevIrqMask;
 			}
-			else if(choseval == 2)
+			else if(choseval == GBA_CMD_BACKUP_SAVE)
 			{
 				//disable interrupts
 				u32 prevIrqMask = REG_IME;
@@ -156,10 +157,10 @@ int main(void) {
 					REG_HS_CTRL |= JOY_RW;
 				}
 			}
-			else if(choseval == 3 || choseval == 4)
+			else if(choseval == GBA_CMD_RESTORE_SAVE || choseval == GBA_CMD_CLEAR_SAVE)
 			{
 				REG_JOYTR = savesize;
-				if(choseval == 3)
+				if(choseval == GBA_CMD_RESTORE_SAVE)
 				{
 					//receive the save
 					for(i = 0; i < savesize; i+=4)
@@ -212,13 +213,13 @@ int main(void) {
 		{
 			REG_HS_CTRL |= JOY_RW;
 			u32 choseval = REG_JOYRE;
-			if(choseval == 5)
+			if(choseval == GBA_CMD_DUMP_BIOS)
 			{
 				//disable interrupts
 				u32 prevIrqMask = REG_IME;
 				REG_IME = 0;
 				//dump BIOS
-				for (i = 0; i < 0x4000; i+=4)
+				for (i = 0; i < GBA_BIOS_SIZE; i+=4)
 				{
 					// the lower bits are inaccurate, so just get it four times :)
 					u32 a = MidiKey2Freq((WaveData *)(i-4), 180-12, 0) * 2;

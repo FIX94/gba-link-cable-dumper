@@ -17,9 +17,9 @@ include $(DEVKITPPC)/wii_rules
 #---------------------------------------------------------------------------------
 TARGET		:=	linkcabledump_wii
 BUILD		:=	build_wii
-SOURCES		:=	source
+SOURCES		:=	source source/app source/link source/storage source/ui
 DATA		:=	data
-INCLUDES	:=	source
+INCLUDES	:=	source common
 
 #---------------------------------------------------------------------------------
 # options for code generation

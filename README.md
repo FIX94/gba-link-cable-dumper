@@ -3,6 +3,8 @@ A GC and Wii Homebrew App to get GBA BIOS, ROMs and saves via the GC GBA Link Ca
 Save Support based on SendSave by Chishm.  
 GBA BIOS Dumper by Dark Fader.  
 
+See the [roadmap](docs/ROADMAP.md) for planned features (GUI, SD2SP2 support, settings, a save/ROM library and GBA-side improvements).
+
 # Usage
 Grab the release from the "releases" tab above and start up the correct dol file on your GC/Wii.  
 Make sure to plug in a GC Controller into Port 1 of your console and the GBA Link Cable into Port 2.  

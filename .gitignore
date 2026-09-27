@@ -1,0 +1,10 @@
+build/
+build_gc/
+build_wii/
+data/
+gba/build/
+*.elf
+*.dol
+*.gba
+*.map
+.DS_Store

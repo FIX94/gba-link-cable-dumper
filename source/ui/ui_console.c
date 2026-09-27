@@ -9,7 +9,7 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include "protocol.h"
+#include "version.h"
 #include "ui/ui.h"
 
 // text console front end

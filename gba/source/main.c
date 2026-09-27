@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include "libSave.h"
 #include "protocol.h"
+#include "version.h"
 
 #define	REG_WAITCNT *(vu16 *)(REG_BASE + 0x204)
 #define JOY_WRITE 2

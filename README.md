@@ -42,11 +42,12 @@ You need [devkitPro](https://devkitpro.org/wiki/Getting_Started) with devkitARM 
 
 On macOS/Linux run `./build.sh` (or `make`), on Windows run `build.bat`.  
 `./build.sh gc` or `./build.sh wii` builds a single platform, `./build.sh clean` removes all build output.  
-The output is `linkcabledump_gc.dol` and `linkcabledump_wii.dol` in the repository root.  
+The output is `linkcabledump_gc_v<version>.dol` and `linkcabledump_wii_v<version>.dol` in the repository root, the version comes from `common/version.h`.  
 `make test` runs host tests for the settings, paths and storage code with your normal compiler (no devkitPro or console needed).
 
 # Source layout
 ```
+common/version.h           version number, used on screen and in the output file names
 common/protocol.h          commands and sizes shared by the GC/Wii side and the GBA payload
 gba/                       GBA multiboot payload (devkitARM), embedded into the dols
 source/main.c              entry point

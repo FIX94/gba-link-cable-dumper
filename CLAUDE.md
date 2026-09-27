@@ -9,7 +9,7 @@ Planned work is in [docs/ROADMAP.md](docs/ROADMAP.md). Update its status markers
 ## Build
 
 ```bash
-./build.sh          # everything (GBA payload -> data/gba_mb.gba -> gc + wii dols)
+./build.sh          # everything (GBA payload -> data/gba_mb.gba -> linkcabledump_{gc,wii}_v<version>.dol)
 ./build.sh gc       # GameCube only
 ./build.sh wii      # Wii only
 ./build.sh clean
@@ -23,10 +23,13 @@ make test           # host tests (settings, ini, paths, storage) with the normal
 - Host tests in `tests/` compile the real sources against stub libogc headers in `tests/stub/`. Device roots like `sd2:/` are plain folders in a temp dir, which works on macOS/Linux. Add tests there for any new code that doesn't need hardware, and keep such code free of libogc-only calls where practical.
 - There's no hardware or emulator testing here. The GBA link cable can't be emulated, so say clearly that a change is untested on hardware. When refactoring the GBA side, compare `gba/gba_mb.gba` against the previous build to confirm it's byte-identical when no behaviour change is intended.
 
+- Versioning: bump `VERSION_MINOR` (or `VERSION_MAJOR`) in `common/version.h` only. The code builds `APP_VERSION` ("v1.7") from it and the Makefiles read it for the output file names. Keep the two `#define VERSION_*` lines in that exact form, since the Makefiles parse them with `sed`.
+
 ## Layout and rules
 
 ```
-common/protocol.h   commands/sizes/version shared by both programs
+common/version.h    VERSION_MAJOR/VERSION_MINOR, the only place the version is set
+common/protocol.h   commands/sizes shared by both programs
 source/app/         screen flow; the only place that combines link + storage + ui
 source/link/        SI transfers, multiboot upload, high-level GBA commands
 source/settings/    settings.ini search/load/save/move, ini parser

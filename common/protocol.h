@@ -9,7 +9,7 @@
 
 // shared between the GC/Wii side and the GBA multiboot payload
 
-#define APP_VERSION "v1.6"
+#define APP_VERSION "v1.7"
 
 // commands sent from the GC/Wii to the GBA
 #define GBA_CMD_NONE			0

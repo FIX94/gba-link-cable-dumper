@@ -16,7 +16,7 @@ include $(DEVKITPPC)/gamecube_rules
 # INCLUDES is a list of directories containing extra header files
 #---------------------------------------------------------------------------------
 TARGET		:=	linkcabledump_gc
-BUILD		:=	build
+BUILD		:=	build_gc
 SOURCES		:=	source
 DATA		:=	data
 INCLUDES	:=	source
@@ -74,9 +74,12 @@ else
 	export LD	:=	$(CXX)
 endif
 
-export OFILES	:=	$(addsuffix .o,$(BINFILES)) \
-					$(CPPFILES:.cpp=.o) $(CFILES:.c=.o) \
+export OFILES_BIN	:=	$(addsuffix .o,$(BINFILES))
+export OFILES_SOURCES	:=	$(CPPFILES:.cpp=.o) $(CFILES:.c=.o) \
 					$(sFILES:.s=.o) $(SFILES:.S=.o)
+export OFILES	:=	$(OFILES_BIN) $(OFILES_SOURCES)
+
+export HFILES	:=	$(addsuffix .h,$(subst .,_,$(BINFILES)))
 
 #---------------------------------------------------------------------------------
 # build a list of include paths
@@ -98,7 +101,7 @@ export OUTPUT	:=	$(CURDIR)/$(TARGET)
 #---------------------------------------------------------------------------------
 $(BUILD):
 	@[ -d $@ ] || mkdir -p $@
-	@make --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile.gc
+	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile.gc
 
 #---------------------------------------------------------------------------------
 clean:
@@ -116,10 +119,12 @@ DEPENDS	:=	$(OFILES:.o=.d)
 $(OUTPUT).dol: $(OUTPUT).elf
 $(OUTPUT).elf: $(OFILES)
 
+$(OFILES_SOURCES) : $(HFILES)
+
 #---------------------------------------------------------------------------------
-# This rule links in binary data with the .jpg extension
+# This rule links in binary data with the .gba extension
 #---------------------------------------------------------------------------------
-%.gba.o	:	%.gba
+%.gba.o	%_gba.h :	%.gba
 #---------------------------------------------------------------------------------
 	@echo $(notdir $<)
 	$(bin2o)

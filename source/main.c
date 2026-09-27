@@ -20,8 +20,7 @@
 //safe si transfer delay in between calls
 #define SI_TRANS_DELAY 50
 
-extern u8 gba_mb_gba[];
-extern u32 gba_mb_gba_size;
+#include "gba_mb_gba.h"
 
 void printmain()
 {

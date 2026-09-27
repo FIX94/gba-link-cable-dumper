@@ -28,6 +28,19 @@ void ui_fatal(const char *msg) __attribute__((noreturn));
 // exits the app because the user asked to
 void ui_exit(void) __attribute__((noreturn));
 
+typedef struct
+{
+	const char *label;
+	const char *value;	// shown after the label, may be NULL
+} ui_menu_item;
+
+// full screen list with the cursor item highlighted,
+// long lists scroll to keep the cursor visible
+void ui_draw_menu(const char *title, const ui_menu_item *items, int count, int cursor, const char *help);
+
+// where dumps are going, shown on the waiting and main screens
+void ui_show_storage(const char *device_name, const char *dump_dir);
+void ui_show_waiting_help(void);
 void ui_show_main_menu(void);
 void ui_show_cart_info(const gba_cart_info *cart);
 void ui_show_cart_menu(const gba_cart_info *cart);

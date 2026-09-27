@@ -12,11 +12,13 @@
 #include "protocol.h"
 #include "gba_mb_gba.h"
 #include "app/app.h"
+#include "app/settings_menu.h"
 #include "link/si_link.h"
 #include "link/multiboot.h"
 #include "link/gba_protocol.h"
 #include "storage/storage.h"
 #include "storage/paths.h"
+#include "settings/settings.h"
 #include "ui/ui.h"
 #include "ui/input.h"
 
@@ -31,20 +33,48 @@ static bool write_chunk(const u8 *data, u32 len, void *user)
 	return true;
 }
 
+static void show_storage(void)
+{
+	const storage_device *d = storage_active();
+	ui_show_storage(d ? d->name : "none", paths_dump_dir());
+}
+
+// checks the device is still there before writing to it
+static bool check_storage(void)
+{
+	if(storage_check())
+		return true;
+	ui_warn("ERROR: Storage device not found, reinsert it and try again!\n");
+	return false;
+}
+
 // waits for a GBA on port 2 and uploads the multiboot payload,
 // returns false if something other than a GBA was found
 static bool connect_gba(void)
 {
-	ui_clear();
-	ui_status("Waiting for a GBA in port 2...\n");
 	u32 type;
+	bool redraw = true;
 	si_link_probe_start();
 	while((type = si_link_probe_poll()) == 0)
 	{
+		if(redraw)
+		{
+			ui_clear();
+			show_storage();
+			ui_show_waiting_help();
+			ui_status("Waiting for a GBA in port 2...\n");
+			redraw = false;
+		}
 		input_scan();
 		ui_frame();
-		if(input_held())
+		u32 btns = input_down();
+		if(btns&INPUT_START)
 			ui_exit();
+		else if(btns&INPUT_X)
+		{
+			settings_menu_run();
+			redraw = true;
+		}
 	}
 	if(!(type & SI_GBA))
 		return false;
@@ -85,11 +115,14 @@ static u32 choose_cart_command(const gba_cart_info *cart)
 // checks the command can run before the GBA is told about it,
 // returns GBA_CMD_NONE if it can not
 static u32 prepare_cart_command(u32 command, const gba_cart_info *cart,
-	const char *gamename, const char *savename)
+	char *gamename, char *savename)
 {
+	if(command != GBA_CMD_NONE && command != GBA_CMD_CLEAR_SAVE && !check_storage())
+		return GBA_CMD_NONE;
+	paths_existing policy = settings_get()->existing;
 	if(command == GBA_CMD_DUMP_ROM)
 	{
-		if(storage_file_exists(gamename))
+		if(!paths_resolve_existing(gamename, PATH_MAX, policy))
 		{
 			ui_warn("ERROR: Game already dumped!\n");
 			return GBA_CMD_NONE;
@@ -97,7 +130,7 @@ static u32 prepare_cart_command(u32 command, const gba_cart_info *cart,
 	}
 	else if(command == GBA_CMD_BACKUP_SAVE)
 	{
-		if(storage_file_exists(savename))
+		if(!paths_resolve_existing(savename, PATH_MAX, policy))
 		{
 			ui_warn("ERROR: Save already backed up!\n");
 			return GBA_CMD_NONE;
@@ -187,8 +220,8 @@ static void handle_cart(void)
 	ui_show_cart_info(&cart);
 	char gamename[PATH_MAX];
 	char savename[PATH_MAX];
-	paths_cart_file(gamename, sizeof(gamename), &cart, ".gba");
-	paths_cart_file(savename, sizeof(savename), &cart, ".sav");
+	paths_cart_file(gamename, sizeof(gamename), &cart, PATHS_KIND_ROM);
+	paths_cart_file(savename, sizeof(savename), &cart, PATHS_KIND_SAVE);
 	ui_show_cart_menu(&cart);
 	u32 command = choose_cart_command(&cart);
 	command = prepare_cart_command(command, &cart, gamename, savename);
@@ -216,7 +249,9 @@ static void dump_bios(void)
 {
 	char biosname[PATH_MAX];
 	paths_bios_file(biosname, sizeof(biosname));
-	if(storage_file_exists(biosname))
+	if(!check_storage())
+		return;
+	if(!paths_resolve_existing(biosname, sizeof(biosname), settings_get()->existing))
 	{
 		ui_warn("ERROR: BIOS already backed up!\n");
 		return;
@@ -244,12 +279,15 @@ static void run_menu(void)
 	while(1)
 	{
 		ui_clear();
+		show_storage();
 		ui_show_main_menu();
 		input_scan();
 		ui_frame();
 		u32 btns = input_down();
 		if(btns&INPUT_START)
 			ui_exit();
+		else if(btns&INPUT_X)
+			settings_menu_run();
 		else if(btns&INPUT_A)
 		{
 			if(gba_is_ready())
@@ -260,7 +298,7 @@ static void run_menu(void)
 	}
 }
 
-void app_run(void)
+void app_run(int argc, char *argv[])
 {
 	si_link_init();
 	dumpbuf = memalign(32,DUMP_BUF_SIZE);
@@ -270,7 +308,15 @@ void app_run(void)
 		ui_clear();
 		ui_fatal("ERROR: No usable device found to write dumped files to!");
 	}
-	if(!storage_mkdirs(paths_dump_dir()))
+	settings_load(argc > 0 ? argv[0] : NULL);
+	if(!settings_apply())
+	{
+		ui_clear();
+		ui_status("Storage device \"%s\" not found, using %s instead.\n",
+			settings_get()->device, storage_active()->name);
+		sleep(3);
+	}
+	if(!paths_create_dirs())
 	{
 		ui_clear();
 		ui_fatal("ERROR: Could not create dumps folder, make sure you have a supported device connected!");

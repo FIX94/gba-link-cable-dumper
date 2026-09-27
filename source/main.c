@@ -12,6 +12,6 @@ int main(int argc, char *argv[])
 {
 	ui_init();
 	input_init();
-	app_run();
+	app_run(argc, argv);
 	return 0;
 }

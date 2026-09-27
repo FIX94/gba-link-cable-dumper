@@ -6,6 +6,7 @@
 #   make gc       build only the GameCube dol
 #   make wii      build only the Wii dol
 #   make gba      build only the GBA multiboot payload
+#   make test     run the host tests (no devkitPro needed)
 #   make clean    remove all build output
 #---------------------------------------------------------------------------------
 export DEVKITPRO	?=	/opt/devkitpro
@@ -14,7 +15,7 @@ export DEVKITPPC	?=	$(DEVKITPRO)/devkitPPC
 
 GBA_PAYLOAD	:=	data/gba_mb.gba
 
-.PHONY: all gba gc wii clean
+.PHONY: all gba gc wii test clean
 
 all: gc wii
 
@@ -31,7 +32,11 @@ gc: $(GBA_PAYLOAD)
 wii: $(GBA_PAYLOAD)
 	@$(MAKE) --no-print-directory -f Makefile.wii
 
+test:
+	@$(MAKE) --no-print-directory -C tests
+
 clean:
+	@$(MAKE) --no-print-directory -C tests clean
 	@$(MAKE) --no-print-directory -C gba clean
 	@$(MAKE) --no-print-directory -f Makefile.gc clean
 	@$(MAKE) --no-print-directory -f Makefile.wii clean

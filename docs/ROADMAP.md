@@ -158,7 +158,7 @@ The program uploaded to the GBA (`gba/source/main.c`) currently just says "Pleas
 
 ## Phase 5: Nice to have ⬜
 
-- ⬜ Continuous integration on Gitea Actions using the `devkitpro/devkitppc` and `devkitpro/devkitarm` Docker images, publishing the `.dol` files as artifacts
+- ✅ Continuous integration on GitHub Actions ([`build.yml`](../.github/workflows/build.yml)) using the `devkitpro/devkitppc` and `devkitpro/devkitarm` Docker images: every push is tested and built (warnings fail the build), and master publishes a release with the `.dol` files when the version is new
 - 🚧 Host-side unit tests (built with the Mac/Linux compiler) for code that doesn't touch hardware: ✅ paths, settings, INI parser (`make test`); ⬜ library scanning, header parsing
 - ⬜ Look into faster transfers (the 50 µs SI delay and 4-byte transfers are the bottleneck; 32 MB takes ~48 minutes)
 - ⬜ Dump log file (what was dumped, when, CRC32)

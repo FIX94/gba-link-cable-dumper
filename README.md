@@ -251,6 +251,8 @@ Renders every GBA payload screen (ready, cart info, ROM dump at 45%, done, no ca
 
 The version is set in one place, [`common/version.h`](common/version.h). It appears in the on-screen title (on the TV and on the GBA) and in the output file names.
 
+GitHub Actions ([`build.yml`](.github/workflows/build.yml)) builds and tests every push and pull request. When master is pushed with a new version, it publishes a release with both `.dol` files.
+
 ---
 
 ## Project layout

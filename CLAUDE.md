@@ -21,10 +21,11 @@ make screens        # render the GBA payload screens to tests/build/screens/*.pn
 - `data/` is generated. The top-level `Makefile` copies the GBA payload there, and bin2o turns it into `build_*/gba_mb_gba.h`.
 - GC and Wii use separate build dirs (`build_gc/`, `build_wii/`). New source subdirectories must be added to `SOURCES` in **both** `Makefile.gc` and `Makefile.wii`. Object files are named by basename, so **source file names must be unique across directories**.
 - A change is done when `./build.sh` passes with **no warnings** on both platforms and `make test` passes.
+- CI (`.github/workflows/build.yml`, GitHub Actions) runs `make test` and builds both dols on every push and pull request, and fails on any warning. Its devkitPro Docker images are pinned to the toolchain above, so bump their tags whenever the local toolchain is updated.
 - Host tests in `tests/` compile the real sources against stub libogc headers in `tests/stub/`. Device roots like `sd2:/` are plain folders in a temp dir, which works on macOS/Linux. Add tests there for any new code that doesn't need hardware, and keep such code free of libogc-only calls where practical.
 - There's no hardware or emulator testing here. The GBA link cable can't be emulated, so say clearly that a change is untested on hardware. When refactoring the GBA side, compare `gba/gba_mb.gba` against the previous build to confirm it's byte-identical when no behaviour change is intended.
 
-- Versioning: bump `VERSION_MINOR` (or `VERSION_MAJOR`) in `common/version.h` only. The code builds `APP_VERSION` ("v1.7") from it and the Makefiles read it for the output file names. Keep the two `#define VERSION_*` lines in that exact form, since the Makefiles parse them with `sed`.
+- Versioning: bump `VERSION_MINOR` (or `VERSION_MAJOR`) in `common/version.h` only. The code builds `APP_VERSION` ("v1.7") from it and the Makefiles read it for the output file names. Keep the two `#define VERSION_*` lines in that exact form, since the Makefiles and CI parse them with `sed`. When master is pushed with a version that has no GitHub release yet, CI publishes that release with both dols, so a version bump on master is a public release.
 
 ## Layout and rules
 

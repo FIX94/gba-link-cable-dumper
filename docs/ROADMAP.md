@@ -140,7 +140,8 @@ The program uploaded to the GBA (`gba/source/main.c`) currently just says "Pleas
 - ✅ Updated with direct map writes right after each word is loaded (a compare per word, a few tile writes per step, no division or printf in the loop)
 - ✅ "Done" messages when a transfer finishes (ROM dumped!, Save backed up!, …)
 - ✅ `make screens` renders the GBA screens to PNG on the Mac for checking layout
-- ⬜ **Test on hardware** and time a 16 MB dump against v1.7 to confirm the bar doesn't slow it down
+- ✅ Tested on hardware (GameCube + GBA, v1.8)
+- ⬜ Time a 16 MB dump against v1.7 to confirm the bar doesn't slow it down (~24 minutes expected)
 
 ### Controls on the GBA
 - ⬜ Let the user start actions from the GBA buttons (e.g. A: dump ROM, B: back up save, Start: cancel)

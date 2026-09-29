@@ -8,3 +8,4 @@ gba/build/
 *.gba
 *.map
 .DS_Store
+tests/build/

@@ -17,24 +17,26 @@ Status key: ✅ done · 🚧 in progress · ⬜ not started
 
 ---
 
-## Phase 1: Settings and storage ⬜
+## Phase 1: Settings and storage 🚧
 
 Everything the GUI and file manager need underneath them.
 
 ### Settings
-- ⬜ `source/settings/settings.c/.h`: a settings struct with load/save and defaults
-- ⬜ Stored as a simple `key=value` INI file at `/gbadumper/settings.ini` on the selected device
-- ⬜ Settings:
-  - storage device (see below)
-  - output folder
-  - separate subfolders for ROMs, saves and BIOS (`ROMs/`, `Saves/`, `BIOS/`)
-  - what to do when a file already exists: **skip** (current behaviour), **overwrite** or **keep both** (add `(1)`, `(2)` …)
-  - keep save history: each backup is timestamped instead of skipped, so older saves are never lost
-- ⬜ Settings screen in the console UI first, reused by the GUI later
+- ✅ `source/settings/settings.c/.h`: a settings struct with load/save and defaults, `settings/ini.c` parser
+- ✅ Stored as a simple `key=value` INI file, searched for next to the dol and then at `/gbadumper/settings.ini` on each device
+- ✅ Settings file location is configurable: moved from the settings screen (leaves a `settings_path=` pointer behind), default folder set at build time with `SETTINGS_DIR`
+- Settings:
+  - ✅ storage device (see below)
+  - ✅ output folder
+  - ✅ separate subfolders for ROMs, saves and BIOS (`ROMs/`, `Saves/`, `BIOS/`)
+  - ✅ what to do when a file already exists: **skip** (the original behaviour), **overwrite** or **keep both** (adds `(1)`, `(2)` …)
+  - ⬜ keep save history: each backup is timestamped instead of skipped, so older saves are never lost
+- ✅ Settings screen in the console UI (X on the waiting screen or main menu), drawn through `ui_draw_menu` so the GUI can reuse it
+- ✅ Host tests for settings, INI parsing and paths (`make test`)
 
 ### Storage devices
-- ⬜ Replace `fatInitDefault()` with explicit mounting per device in `storage/storage.c`
-- ⬜ A device list, with the ones present on this console detected at startup:
+- ✅ Replace `fatInitDefault()` with explicit mounting per device in `storage/storage.c`
+- ✅ A device list, with the ones present on this console detected at startup:
 
   | Device | Platform | libogc interface | Mount name |
   |---|---|---|---|
@@ -44,16 +46,20 @@ Everything the GUI and file manager need underneath them.
   | Front SD slot | Wii | `__io_wiisd` | `sd:` |
   | USB storage | Wii | `__io_usbstorage` | `usb:` |
 
-- ⬜ "Auto" picks the first device present (SD2SP2 → SD Gecko A → B on GC; SD → USB on Wii)
-- ⬜ Show which device is in use on the main screen
-- ⬜ Handle the card being removed or swapped (remount, return a clear error instead of crashing)
+- ✅ "Auto" picks the first device present (SD2SP2 → SD Gecko A → B on GC; SD → USB → SD Gecko A → B on Wii)
+- ✅ Falls back to Auto with a message if the chosen device is missing at startup
+- ✅ Show which device is in use on the waiting and main screens
+- ✅ Check the active card is still inserted before every write, remount it or show an error instead of failing mid-write
+- ⬜ Rescan for devices inserted after startup (currently only devices present at startup can be chosen)
+- ⬜ **Test on hardware**: SD2SP2, SD Gecko A/B, Wii SD, USB
 
 > The SD2SP2 sits in Serial Port 2 on the bottom of the GameCube (EXI bus). It does not clash with the link cable, which uses controller port 2 (SI bus).
 
 ### Folder selection
-- ⬜ Folder browser: list directories, go into or up, pick the current folder
-- ⬜ Create a new folder from the browser (on-screen keyboard, or a generated name for the console UI)
-- ⬜ The chosen folder is saved in settings and created on startup if it's missing
+- ✅ Folder browser: list directories, go into or up, pick the current folder, switch device (for the settings file location)
+- ✅ Create a new folder from the browser (generated "New Folder" names in the console UI)
+- ⬜ Rename folders / type a name (needs an on-screen keyboard, better done with the GUI)
+- ✅ The chosen folder is saved in settings and created on startup if it's missing
 
 ---
 
@@ -149,7 +155,7 @@ The program uploaded to the GBA (`gba/source/main.c`) currently just says "Pleas
 ## Phase 5: Nice to have ⬜
 
 - ⬜ Continuous integration on Gitea Actions using the `devkitpro/devkitppc` and `devkitpro/devkitarm` Docker images, publishing the `.dol` files as artifacts
-- ⬜ Host-side unit tests (built with the Mac/Linux compiler) for code that doesn't touch hardware: paths, settings parser, library scanning, header parsing
+- 🚧 Host-side unit tests (built with the Mac/Linux compiler) for code that doesn't touch hardware: ✅ paths, settings, INI parser (`make test`); ⬜ library scanning, header parsing
 - ⬜ Look into faster transfers (the 50 µs SI delay and 4-byte transfers are the bottleneck; 32 MB takes ~48 minutes)
 - ⬜ Dump log file (what was dumped, when, CRC32)
 - ⬜ Compare dumps against a No-Intro DAT file to confirm good dumps

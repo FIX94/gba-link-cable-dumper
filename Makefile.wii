@@ -15,9 +15,11 @@ include $(DEVKITPPC)/wii_rules
 # SOURCES is a list of directories containing source code
 # INCLUDES is a list of directories containing extra header files
 #---------------------------------------------------------------------------------
-TARGET		:=	linkcabledump_wii
+# version comes from common/version.h, e.g. linkcabledump_wii_v1.7
+export VERSION_TAG	?=	v$(shell sed -n 's/^\#define VERSION_MAJOR //p' $(CURDIR)/common/version.h).$(shell sed -n 's/^\#define VERSION_MINOR //p' $(CURDIR)/common/version.h)
+TARGET		:=	linkcabledump_wii_$(VERSION_TAG)
 BUILD		:=	build_wii
-SOURCES		:=	source source/app source/link source/storage source/ui
+SOURCES		:=	source source/app source/link source/settings source/storage source/ui
 DATA		:=	data
 INCLUDES	:=	source common
 
@@ -26,6 +28,11 @@ INCLUDES	:=	source common
 #---------------------------------------------------------------------------------
 
 CFLAGS	= -g -O3 -Wall $(MACHDEP) $(INCLUDE)
+
+# folder searched for settings.ini on each device, e.g. make SETTINGS_DIR=/apps/gbadumper
+ifneq ($(strip $(SETTINGS_DIR)),)
+CFLAGS	+= -DSETTINGS_DIR=\"$(SETTINGS_DIR)\"
+endif
 CXXFLAGS	=	$(CFLAGS)
 
 LDFLAGS	= -g $(MACHDEP) -Wl,-Map,$(notdir $@).map
@@ -106,7 +113,7 @@ $(BUILD):
 #---------------------------------------------------------------------------------
 clean:
 	@echo clean ...
-	@rm -fr $(BUILD) $(OUTPUT).elf $(OUTPUT).dol
+	@rm -fr $(BUILD) linkcabledump_wii*.elf linkcabledump_wii*.dol
 
 #---------------------------------------------------------------------------------
 else

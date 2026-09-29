@@ -8,6 +8,7 @@
 #define __APP_H__
 
 // runs the dumper, only returns on allocation failure
-void app_run(void);
+// argv[0] is used to find settings next to the dol when the loader provides it
+void app_run(int argc, char *argv[]);
 
 #endif

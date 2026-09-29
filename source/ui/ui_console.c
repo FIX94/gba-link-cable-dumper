@@ -9,7 +9,7 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include "protocol.h"
+#include "version.h"
 #include "ui/ui.h"
 
 // text console front end
@@ -81,10 +81,52 @@ void ui_exit(void)
 	exit(0);
 }
 
+// rows available for menu items below the title
+#define MENU_ROWS 14
+
+void ui_draw_menu(const char *title, const ui_menu_item *items, int count, int cursor, const char *help)
+{
+	ui_clear();
+	printf("%s\n \n", title);
+	int first = 0;
+	if(count > MENU_ROWS)
+	{
+		first = cursor - MENU_ROWS/2;
+		if(first < 0) first = 0;
+		if(first > count - MENU_ROWS) first = count - MENU_ROWS;
+	}
+	printf(first > 0 ? "   ...\n" : " \n");
+	int i;
+	for(i = first; i < count && i < first + MENU_ROWS; i++)
+	{
+		//highlight the cursor line in yellow
+		printf(i == cursor ? "\x1b[33m > " : "   ");
+		if(items[i].value)
+			printf("%s: %s", items[i].label, items[i].value);
+		else
+			printf("%s", items[i].label);
+		printf(i == cursor ? "\x1b[37m\n" : "\n");
+	}
+	printf(i < count ? "   ...\n" : " \n");
+	if(help)
+		printf(" \n%s\n", help);
+}
+
+void ui_show_storage(const char *device_name, const char *dump_dir)
+{
+	printf("Saving to %s (%s)\n \n", dump_dir, device_name);
+}
+
+void ui_show_waiting_help(void)
+{
+	printf("Press X for settings, Start to exit.\n \n");
+}
+
 void ui_show_main_menu(void)
 {
 	printf("Press A once you have a GBA Game inserted.\n");
-	printf("Press Y to backup the GBA BIOS.\n \n");
+	printf("Press Y to backup the GBA BIOS.\n");
+	printf("Press X for settings.\n \n");
 }
 
 void ui_show_cart_info(const gba_cart_info *cart)

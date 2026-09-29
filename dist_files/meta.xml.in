@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<app version="1">
+	<name>GBA Link Cable Dumper</name>
+	<coder>FIX94, Tom Vardy</coder>
+	<version>@VERSION@</version>
+	<release_date>@DATE@</release_date>
+	<short_description>Dump GBA ROMs, saves and BIOS</short_description>
+	<long_description>Back up Game Boy Advance cartridges over the GameCube GBA link cable: dump ROMs, back up, restore and clear saves, and dump the GBA BIOS. Needs a Wii with GameCube controller ports, a GameCube controller in port 1 and the link cable in port 2.</long_description>
+</app>

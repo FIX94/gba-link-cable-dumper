@@ -9,3 +9,4 @@ gba/build/
 *.map
 .DS_Store
 tests/build/
+dist/

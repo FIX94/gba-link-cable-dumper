@@ -9,7 +9,7 @@ This is a continued fork of [FIX94's GBA Link Cable Dumper](https://github.com/F
 ## Features
 
 - **Dump GBA ROMs** to `.gba` files. The size is detected automatically, from 1 MB to 32 MB.
-- **Back up saves** to `.sav` files. All common save types are supported:
+- **Back up saves** to `.sav` files, with the date and time in the name so every backup is kept. All common save types are supported:
 
   | Save type | Size |
   |---|---|
@@ -17,7 +17,7 @@ This is a continued fork of [FIX94's GBA Link Cable Dumper](https://github.com/F
   | SRAM | 32 KB |
   | Flash | 64 KB / 128 KB |
 
-- **Restore saves** from a `.sav` file back to the cartridge (the size is checked first).
+- **Restore saves** back to the cartridge. The newest backup for the inserted game is used and shown on the TV before you choose (the size is checked first).
 - **Clear saves** on the cartridge.
 - **Dump the GBA BIOS** to `gba_bios.bin`.
 - **Choose your storage device**: SD2SP2, SD Gecko (slot A/B), Wii SD slot or USB. Auto-detect picks the first one found.
@@ -46,10 +46,10 @@ This is a continued fork of [FIX94's GBA Link Cable Dumper](https://github.com/F
 
 ## Installation
 
-Download the latest `.dol` for your console from the [Releases](../../releases) page, or [build it yourself](#building).
+Download the latest `gba-link-cable-dumper-v<version>.zip` from the [Releases](../../releases) page, or [build it yourself](#building).
 
-- **GameCube (Swiss):** copy `linkcabledump_gc_v<version>.dol` anywhere on your SD card (e.g. `/tools/`) and launch it from Swiss.
-- **Wii (Homebrew Channel):** create `sd:/apps/gbadumper/`, copy `linkcabledump_wii_v<version>.dol` into it and rename it to `boot.dol`.
+- **GameCube (Swiss):** copy `GameCube/linkcabledump_gc_v<version>.dol` anywhere on your SD card (e.g. `/tools/`) and launch it from Swiss.
+- **Wii (Homebrew Channel):** copy the `apps` folder from `Wii/` to the root of your SD card. The dumper then appears in the Homebrew Channel as "GBA Link Cable Dumper".
 
 ---
 
@@ -104,11 +104,17 @@ By default everything goes into `/dumps` on the storage device, named after the 
 ```
 dumps/
 ├── POKEMON SAPP [AXPE01].gba
-├── POKEMON SAPP [AXPE01].sav
+├── POKEMON SAPP [AXPE01] 2026-09-29 18-45-12.sav
+├── POKEMON SAPP [AXPE01] 2026-10-02 09-03-55.sav
 └── gba_bios.bin
 ```
 
-With **ROMs/Saves/BIOS subfolders** turned on, the files go into `dumps/ROMs/`, `dumps/Saves/` and `dumps/BIOS/` instead. Characters that aren't allowed in file names are replaced with `_`.
+- **Save backups** get the date and time from the console's clock, so each backup is a new file and older ones are kept. Set **Save backup names** to Plain in the settings to use `POKEMON SAPP [AXPE01].sav` instead.
+- **Restore** uses the newest backup for the inserted game, by modification date. This works whatever the name style, including plain names from older versions and files copied from a computer. The TV shows which file will be used.
+- **Subfolders:** with **ROMs/Saves/BIOS subfolders** turned on, the files go into `dumps/ROMs/`, `dumps/Saves/` and `dumps/BIOS/` instead.
+- **File names:** characters that aren't allowed are replaced with `_`.
+
+> **Check your console's clock.** Timestamps come from the GameCube/Wii clock. On a GameCube, set it in the main menu's calendar (boot without a disc and press Start on the IPL menu, or use Swiss's settings). On a Wii, use System Settings.
 
 ---
 
@@ -138,6 +144,7 @@ Press **X** on the waiting screen or the main menu. Use the **D-Pad** to move, *
 | Output folder | Any folder, chosen with the folder browser (you can create new folders there too) |
 | ROMs/Saves/BIOS subfolders | On / Off |
 | If a file already exists | **Skip** (default, never dumps twice), **Overwrite**, or **Keep both** (saves as `name (1).sav`, `name (2).sav`, …) |
+| Save backup names | **Date and time** (default, every backup is kept) or **Plain** |
 | Settings file | Move `settings.ini` to any folder on any device |
 
 ### settings.ini
@@ -154,6 +161,8 @@ dump_dir=/dumps
 split_folders=0
 ; existing_files: skip, overwrite or keep_both
 existing_files=skip
+; save_names: timestamp adds the date and time to save backups, or plain
+save_names=timestamp
 ```
 
 At startup the dumper looks for `settings.ini` in this order and uses the first one it finds:
@@ -232,6 +241,8 @@ Tested with devkitPPC r47.1, libogc 2.13.0, libfat-ogc 2.1.0 and devkitARM r66.
 
 The output is `linkcabledump_gc_v<version>.dol` and `linkcabledump_wii_v<version>.dol` in the repository root.
 
+`make dist` builds both and packages a release zip in `dist/`, with the GameCube `.dol` and a ready-to-copy Homebrew Channel folder (`Wii/apps/gbadumper/boot.dol` and `meta.xml`).
+
 The build compiles the GBA payload first, copies it into `data/`, then embeds it in both `.dol` files. `make` works as well as `./build.sh`.
 
 ### Build options
@@ -304,6 +315,7 @@ docs/ROADMAP.md            planned features
 | "Storage device … not found, using … instead" | The device chosen in settings is missing. Insert it and restart, or change the device in settings. |
 | "No (Valid) GBA Card inserted!" | Clean the cartridge contacts and reseat it. The header check failed. |
 | "Game already dumped!" / "Save already backed up!" | A file with that name already exists. Change **If a file already exists** in the settings to Overwrite or Keep both. |
+| Save backups have the wrong date | The console's clock is wrong. Set it in the GameCube calendar or Wii System Settings. |
 | "Save has the wrong size" | The `.sav` file must be exactly the cartridge's save size. Emulator saves sometimes have extra bytes at the end. |
 | Wii: nothing happens | Only Wii models with GameCube controller ports can use the link cable |
 
@@ -311,7 +323,7 @@ docs/ROADMAP.md            planned features
 
 ## Roadmap
 
-Planned work includes save history with timestamps, a graphical interface, a library for browsing and restoring your dumps, and button controls on the GBA. See [docs/ROADMAP.md](docs/ROADMAP.md) for the details and current status.
+Planned work includes a graphical interface, a library for browsing and restoring your dumps, and button controls on the GBA. See [docs/ROADMAP.md](docs/ROADMAP.md) for the details and current status.
 
 ## Contributing
 

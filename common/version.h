@@ -9,8 +9,8 @@
 
 // the only place the version is set, the Makefiles read these two lines
 // to put the version into the output file names
-#define VERSION_MAJOR 1
-#define VERSION_MINOR 9
+#define VERSION_MAJOR 2
+#define VERSION_MINOR 0
 
 #define VERSION_STR_(x) #x
 #define VERSION_STR(x) VERSION_STR_(x)

@@ -1,0 +1,110 @@
+# Runs the host tests and builds both dols on every push and pull request.
+# On master it also publishes a GitHub release with the dols when the version
+# in common/version.h hasn't been released yet.
+name: Build
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+env:
+  # Pinned to the toolchain in CLAUDE.md (devkitPPC r47.1, libogc 2.13.0,
+  # devkitARM r66), which gives dols byte-identical to a local build. The tags
+  # are image build dates and packages often land before their GitHub release
+  # (20251231 already has r48/r67), so check the Toolchain notice on a run
+  # after changing them. Tags: https://hub.docker.com/u/devkitpro
+  DEVKITARM_IMAGE: devkitpro/devkitarm:20251117
+  DEVKITPPC_IMAGE: devkitpro/devkitppc:20251117
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.info.outputs.version }}
+      toolchain: ${{ steps.info.outputs.toolchain }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Version and toolchain
+        id: info
+        run: |
+          major=$(sed -n 's/^#define VERSION_MAJOR //p' common/version.h)
+          minor=$(sed -n 's/^#define VERSION_MINOR //p' common/version.h)
+          ppc=$(docker run --rm "$DEVKITPPC_IMAGE" dkp-pacman -Q devkitPPC libogc libfat-ogc)
+          arm=$(docker run --rm "$DEVKITARM_IMAGE" dkp-pacman -Q devkitARM libgba)
+          toolchain=$(printf '%s\n%s\n' "$ppc" "$arm" | paste -sd, - | sed 's/,/, /g')
+          echo "version=v$major.$minor" >> "$GITHUB_OUTPUT"
+          echo "toolchain=$toolchain" >> "$GITHUB_OUTPUT"
+          echo "::notice title=Toolchain::$toolchain"
+
+      - name: Host tests
+        run: make test
+
+      # The devkitPPC image has no libgba, so the GBA payload is built in the
+      # devkitARM image first. The dol builds then embed data/gba_mb.gba.
+      - name: Build
+        run: |
+          dkp() { docker run --rm -v "$PWD:/src" -w /src "$@" 2>&1 | tee -a build.log; }
+          dkp "$DEVKITARM_IMAGE" make gba
+          dkp "$DEVKITPPC_IMAGE" make -f Makefile.gc
+          dkp "$DEVKITPPC_IMAGE" make -f Makefile.wii
+          if grep -q 'warning:' build.log; then
+            grep 'warning:' build.log | sed 's/^/::warning::/'
+            echo "::error::The build has warnings. It has to build without any."
+            exit 1
+          fi
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: linkcabledump_${{ steps.info.outputs.version }}
+          path: linkcabledump_*.dol
+          if-no-files-found: error
+
+  release:
+    needs: build
+    # only master of this repo, not forks or the Gitea mirror
+    if: github.ref == 'refs/heads/master' && github.repository == 'tvmadlad/gba-link-cable-dumper'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency: release
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: linkcabledump_${{ needs.build.outputs.version }}
+          path: dist
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ needs.build.outputs.version }}
+          TOOLCHAIN: ${{ needs.build.outputs.toolchain }}
+        run: |
+          if gh release view "$VERSION" > /dev/null 2>&1; then
+            echo "::notice::$VERSION is already released. Bump the version in common/version.h to publish a new release."
+            exit 0
+          fi
+          notes=$(cat <<EOF
+          - **GameCube:** \`linkcabledump_gc_$VERSION.dol\`, run it from Swiss
+          - **Wii:** \`linkcabledump_wii_$VERSION.dol\`, copy it to \`sd:/apps/gbadumper/boot.dol\`
+
+          See the [README]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/blob/$VERSION/README.md#installation) for setup and usage.
+
+          Built by GitHub Actions from $GITHUB_SHA with $TOOLCHAIN.
+          EOF
+          )
+          gh release create "$VERSION" dist/*.dol \
+            --target "$GITHUB_SHA" \
+            --title "$VERSION" \
+            --notes "$notes" \
+            --generate-notes

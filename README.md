@@ -1,68 +1,306 @@
 # GBA Link Cable Dumper
-A GC and Wii Homebrew App to get GBA BIOS, ROMs and saves via the GC GBA Link Cable.  
-Save Support based on SendSave by Chishm.  
-GBA BIOS Dumper by Dark Fader.  
 
-See the [roadmap](docs/ROADMAP.md) for planned features (GUI, SD2SP2 support, settings, a save/ROM library and GBA-side improvements).
+Back up your Game Boy Advance cartridges with a GameCube or Wii. Dump ROMs, back up, restore and clear saves, and dump the GBA BIOS, all over the official GameCube–GBA link cable. You don't need a flash cart or any special dumping hardware.
 
-# Usage
-Grab the release from the "releases" tab above and start up the correct dol file on your GC/Wii.  
-Make sure to plug in a GC Controller into Port 1 of your console and the GBA Link Cable into Port 2.  
-Now Boot your GBA without a cart inserted, it should automatically boot into the dumper when connected. From there you can just follow the instructions on screen.  
-If your GBA resets when you get to the step of inserting a cart, try to boot your GBA with the cart already inserted and holding down start+select on the GBA bootup, this aborts the game launch and should allow the dumper to boot up from there.  
-The bin, gba and sav files dumped will be placed in a folder called "dumps" on your storage device by default, this can be changed in the settings. Please note that dumping GBA ROMs can take a long time (32mb takes about 48 minutes) because of the cable protocol limitations, an estimation will be displayed on screen before you dump it as a reference.
+This is a continued fork of [FIX94's GBA Link Cable Dumper](https://github.com/FIX94/gba-link-cable-dumper). It builds with current devkitPro, adds SD2SP2 support, storage selection, settings and a folder browser, and has a restructured codebase that's ready for a GUI. See the [roadmap](docs/ROADMAP.md) for what's coming next.
+
+---
+
+## Features
+
+- **Dump GBA ROMs** to `.gba` files. The size is detected automatically, from 1 MB to 32 MB.
+- **Back up saves** to `.sav` files. All common save types are supported:
+
+  | Save type | Size |
+  |---|---|
+  | EEPROM | 512 B / 8 KB |
+  | SRAM | 32 KB |
+  | Flash | 64 KB / 128 KB |
+
+- **Restore saves** from a `.sav` file back to the cartridge (the size is checked first).
+- **Clear saves** on the cartridge.
+- **Dump the GBA BIOS** to `gba_bios.bin`.
+- **Choose your storage device**: SD2SP2, SD Gecko (slot A/B), Wii SD slot or USB. Auto-detect picks the first one found.
+- **Settings screen**: storage device, output folder, ROMs/Saves/BIOS subfolders, and what to do when a file already exists.
+- **Folder browser**: pick or create the output folder on the console.
+- **Portable settings file**: `settings.ini` can live in the default folder or anywhere you choose.
+- **Safe writing**: the card is checked before every write and existing dumps are never overwritten unless you ask for that.
+- **No setup on the GBA**: the dumper is sent to the GBA over the cable (multiboot), so the GBA only needs to be switched on.
+
+---
+
+## What you need
+
+| | |
+|---|---|
+| **Console** | Nintendo GameCube, or a Wii with GameCube controller ports (the original RVL-001 model; not the Wii Family Edition or Wii mini) |
+| **Homebrew** | A way to run `.dol` files: [Swiss](https://github.com/emukidid/swiss-gc) on GameCube, the Homebrew Channel on Wii |
+| **Cable** | Official GameCube Game Boy Advance Cable (DOL-011) |
+| **Handheld** | Game Boy Advance or Game Boy Advance SP |
+| **Controller** | GameCube controller in **port 1** |
+| **Storage** | GameCube: SD2SP2 or SD Gecko. Wii: SD card, USB storage or SD Gecko |
+
+---
+
+## Installation
+
+Download the latest `.dol` for your console from the [Releases](../../releases) page, or [build it yourself](#building).
+
+- **GameCube (Swiss):** copy `linkcabledump_gc_v<version>.dol` anywhere on your SD card (e.g. `/tools/`) and launch it from Swiss.
+- **Wii (Homebrew Channel):** create `sd:/apps/gbadumper/`, copy `linkcabledump_wii_v<version>.dol` into it and rename it to `boot.dol`.
+
+---
+
+## Usage
+
+1. Plug a GameCube controller into **port 1** and the GBA link cable into **port 2**.
+2. Start the dumper on your console. The screen shows which device and folder dumps will be saved to.
+3. Connect the link cable to the GBA and turn the GBA on **without a cartridge**. The dumper is sent to it automatically, and the GBA screen says "Please look at the TV".
+4. Insert the cartridge into the GBA and press **A** on the controller.
+5. The game's name, ID, ROM size and save size are shown. Choose what to do:
+
+   | Button | Action |
+   |---|---|
+   | **A** | Dump the ROM |
+   | **B** | Cancel |
+   | **Y** | Back up the save |
+   | **X** | Restore the save from the SD card to the cartridge |
+   | **Z** | Clear the save on the cartridge |
+
+6. Other buttons:
+
+   | Button | Where | Action |
+   |---|---|---|
+   | **Y** | main menu | Dump the GBA BIOS |
+   | **X** | waiting screen or main menu | Open settings |
+   | **Start** | anywhere | Exit |
+
+> **The GBA resets when you insert the cartridge?** Turn the GBA off, insert the cartridge, then hold **Start + Select** while turning it on. This skips the game's boot, and the dumper can then be sent as normal.
+
+### Dump times
+
+The link cable is slow, so ROM dumps take a while. The estimated time is shown before you start.
+
+| ROM size | Approximate time |
+|---|---|
+| 4 MB | 6 minutes |
+| 8 MB | 12 minutes |
+| 16 MB | 24 minutes |
+| 32 MB | 48 minutes |
+
+Save backups, restores and BIOS dumps take a few seconds.
+
+### Output files
+
+By default everything goes into `/dumps` on the storage device, named after the game's header:
+
+```
+dumps/
+├── POKEMON SAPP [AXPE01].gba
+├── POKEMON SAPP [AXPE01].sav
+└── gba_bios.bin
+```
+
+With **ROMs/Saves/BIOS subfolders** turned on, the files go into `dumps/ROMs/`, `dumps/Saves/` and `dumps/BIOS/` instead. Characters that aren't allowed in file names are replaced with `_`.
+
+---
 
 ## Storage devices
-| Device | GameCube | Wii |
-|---|---|---|
-| SD2SP2 (Serial Port 2) | ✓ | |
-| SD Gecko in memory card slot A or B | ✓ | ✓ |
-| Front SD slot | | ✓ |
-| USB storage | | ✓ |
 
-All devices that are present are mounted at startup. By default the first one found is used (SD2SP2, then SD Gecko A, then B on GameCube; SD, then USB, then SD Gecko on Wii), a specific device can be picked in the settings.
+| Device | GameCube | Wii | Auto-detect order |
+|---|:---:|:---:|---|
+| SD2SP2 (Serial Port 2) | ✓ | | GC: 1st |
+| SD Gecko in memory card slot A | ✓ | ✓ | GC: 2nd, Wii: 3rd |
+| SD Gecko in memory card slot B | ✓ | ✓ | GC: 3rd, Wii: 4th |
+| Front SD slot | | ✓ | Wii: 1st |
+| USB storage | | ✓ | Wii: 2nd |
+
+Every device present at startup is mounted. **Auto** uses the first one in the order above. You can pick a specific device in the settings. If it's missing at startup, the dumper tells you and falls back to Auto.
+
+The SD2SP2 sits in Serial Port 2 on the bottom of the GameCube and works alongside the link cable, which uses controller port 2.
+
+---
 
 ## Settings
-Press X on the "Waiting for a GBA" screen or the main menu to open the settings. Use the D-Pad to move, A or Left/Right to change a value and B to save and go back.
-- **Storage device**: Auto or a specific device
-- **Output folder**: pick or create a folder with the folder browser
-- **ROMs/Saves/BIOS subfolders**: put each kind of file into its own subfolder of the output folder
-- **If a file already exists**: Skip (don't dump it again), Overwrite, or Keep both (adds " (1)", " (2)", ... to the new file)
-- **Settings file**: move `settings.ini` to any folder on any device
 
-Settings are stored in `settings.ini`. At startup it is looked for in this order, the first one found is used:
-1. Next to the dol, if the loader passes its location (e.g. `sd:/apps/gbadumper/settings.ini` from the Homebrew Channel)
-2. `/gbadumper/settings.ini` on each device, in the order above
+Press **X** on the waiting screen or the main menu. Use the **D-Pad** to move, **A** or **Left/Right** to change a value, and **B** to save and go back.
 
-When the settings file is moved somewhere else, a small file containing `settings_path=<new location>` is left in its old place so it's still found on the next start. The default `/gbadumper` folder can be changed at build time with `./build.sh SETTINGS_DIR=/somewhere` (run `./build.sh clean` first).
+| Setting | Options |
+|---|---|
+| Storage device | Auto, or any device found at startup |
+| Output folder | Any folder, chosen with the folder browser (you can create new folders there too) |
+| ROMs/Saves/BIOS subfolders | On / Off |
+| If a file already exists | **Skip** (default, never dumps twice), **Overwrite**, or **Keep both** (saves as `name (1).sav`, `name (2).sav`, …) |
+| Settings file | Move `settings.ini` to any folder on any device |
 
-# Building
-You need [devkitPro](https://devkitpro.org/wiki/Getting_Started) with devkitARM (for the GBA payload) and devkitPPC (for the GC/Wii dols):  
-`sudo dkp-pacman -S gba-dev gamecube-dev wii-dev`  
+### settings.ini
 
-On macOS/Linux run `./build.sh` (or `make`), on Windows run `build.bat`.  
-`./build.sh gc` or `./build.sh wii` builds a single platform, `./build.sh clean` removes all build output.  
-The output is `linkcabledump_gc_v<version>.dol` and `linkcabledump_wii_v<version>.dol` in the repository root, the version comes from `common/version.h`.  
-`make test` runs host tests for the settings, paths and storage code with your normal compiler (no devkitPro or console needed).
+Settings are saved to a plain text file you can also edit on a computer:
 
-# Source layout
+```ini
+; GBA Link Cable Dumper settings
+; device: auto, sd2, sda, sdb
+device=auto
+; dump_dir: folder on the device, starting with /
+dump_dir=/dumps
+; split_folders: 1 puts files into ROMs/, Saves/ and BIOS/
+split_folders=0
+; existing_files: skip, overwrite or keep_both
+existing_files=skip
+```
+
+At startup the dumper looks for `settings.ini` in this order and uses the first one it finds:
+
+1. Next to the `.dol`, if the loader passes its location (the Homebrew Channel does, Swiss doesn't)
+2. `/gbadumper/settings.ini` on each device, in auto-detect order
+
+If you move the settings file from the settings screen, a small pointer file (`settings_path=<new location>`) is left behind so it's still found next time. If no settings file exists, the defaults are used, and the file is only created once you change something.
+
+---
+
+## How it works
+
+```
+ GameCube / Wii                                        Game Boy Advance
+┌─────────────────────┐   GC–GBA link cable      ┌──────────────────────┐
+│ linkcabledump.dol   │   (JOY Bus, port 2)      │ gba_mb.gba (payload) │
+│                     │ ───── 1. multiboot ────► │  runs from GBA RAM   │
+│ link/  storage/     │ ◄──── 2. cart info ───── │  reads the cartridge │
+│ ui/    settings/    │ ───── 3. command ──────► │  (ROM, save, BIOS)   │
+│                     │ ◄──── 4. data ────────── │                      │
+└─────────┬───────────┘                          └──────────────────────┘
+          │ writes .gba / .sav / .bin
+          ▼
+   SD2SP2 / SD Gecko / SD / USB
+```
+
+1. **Multiboot upload.** When a GBA without a cartridge boots, its BIOS waits for a multiboot program over the link port. The console acts as the multiboot host. It exchanges session keys with the GBA BIOS, then sends the small payload program (`gba/`) encrypted and with a checksum, just like official GameCube games do for GBA link features. The payload runs from the GBA's own RAM, so the cartridge slot is free.
+2. **Reading the cartridge.** When you insert a cartridge and press A, the payload:
+   - checks the cartridge header to see that a valid game is present
+   - works out the ROM size. Reads past the end of a cartridge return a known pattern, so the payload looks for where that pattern starts.
+   - identifies the save type by searching the ROM for the save library ID strings that Nintendo's SDK builds into every game (`EEPROM_V`, `SRAM_V`, `FLASH_V`, `FLASH512_V`, `FLASH1M_V`)
+   - sends the sizes and the 192-byte ROM header to the console
+3. **Commands.** The console sends a command number: dump ROM, back up, restore or clear the save, or dump the BIOS. The numbers are defined once in [`common/protocol.h`](common/protocol.h), which both programs use.
+4. **Transfers.** Data moves 4 bytes at a time over the JOY Bus. The GBA disables interrupts during a transfer to keep the timing exact. Saves are read and written with each chip's own protocol (EEPROM, SRAM, Flash), using code from Chishm's SendSave. The GBA doesn't let programs read the BIOS directly, so it's dumped with Dark Fader's trick of reading it back through a BIOS sound function.
+
+The payload is embedded in the `.dol` at build time, so the console side and GBA side always come from the same build and match.
+
+---
+
+## Building
+
+### Requirements
+
+[devkitPro](https://devkitpro.org/wiki/Getting_Started) with devkitARM (for the GBA payload) and devkitPPC (for the GameCube/Wii app):
+
+```bash
+sudo dkp-pacman -S gba-dev gamecube-dev wii-dev
+```
+
+Tested with devkitPPC r47.1, libogc 2.13.0, libfat-ogc 2.1.0 and devkitARM r66.
+
+### Build
+
+**macOS / Linux:**
+
+```bash
+./build.sh          # build everything
+./build.sh gc       # GameCube only
+./build.sh wii      # Wii only
+./build.sh clean    # remove all build output
+```
+
+**Windows:** run `build.bat` from the devkitPro MSYS2 shell.
+
+The output is `linkcabledump_gc_v<version>.dol` and `linkcabledump_wii_v<version>.dol` in the repository root.
+
+The build compiles the GBA payload first, copies it into `data/`, then embeds it in both `.dol` files. `make` works as well as `./build.sh`.
+
+### Build options
+
+| Option | Default | Description |
+|---|---|---|
+| `SETTINGS_DIR` | `/gbadumper` | Folder searched for `settings.ini` on each device, e.g. `./build.sh SETTINGS_DIR=/apps/gbadumper`. Run `./build.sh clean` first. |
+
+### Tests
+
+```bash
+make test
+```
+
+Runs host tests for the settings, INI parser, paths and storage code using your normal compiler. You don't need devkitPro or a console. The real source files are compiled against stub libogc headers in [`tests/stub`](tests/stub).
+
+### Versioning
+
+The version is set in one place, [`common/version.h`](common/version.h). It appears in the on-screen title (on the TV and on the GBA) and in the output file names.
+
+---
+
+## Project layout
+
 ```
 common/version.h           version number, used on screen and in the output file names
 common/protocol.h          commands and sizes shared by the GC/Wii side and the GBA payload
 gba/                       GBA multiboot payload (devkitARM), embedded into the dols
+  source/main.c            payload: command loop, ROM/save/BIOS transfers
+  source/libSave.c         save chip access (EEPROM, SRAM, Flash), from SendSave
 source/main.c              entry point
 source/app/app             screen flow, ties everything below together
 source/app/settings_menu   settings screen
 source/app/folder_browser  folder picker used by the settings screen
-source/link/si_link        raw GBA link cable transfers over controller port 2
+source/link/si_link        raw link cable transfers over controller port 2
 source/link/multiboot      uploads the GBA payload
-source/link/gba_protocol   high level commands (cart info, ROM/save/BIOS transfers)
+source/link/gba_protocol   high-level commands (cart info, ROM/save/BIOS transfers)
 source/settings/settings   settings.ini search, loading, saving and moving
 source/settings/ini        key=value file parser
 source/storage/storage     device table, mounting and file helpers
 source/storage/paths       output folder, subfolders and file naming
 source/ui/ui.h             front end interface, implemented by ui_console.c
 source/ui/input.h          controller abstraction, implemented by input_pad.c
-tests/                     host tests, built against the stub libogc headers in tests/stub
+tests/                     host tests with stub libogc headers
+docs/ROADMAP.md            planned features
 ```
-`link/` and `storage/` never draw to the screen or read the controller, so a graphical front end only needs to replace `ui_console.c`.
+
+`link/` and `storage/` never draw to the screen or read the controller. Everything on screen goes through `ui.h` and every button read goes through `input.h`, so a graphical front end only needs to replace `ui_console.c`.
+
+---
+
+## Troubleshooting
+
+| Problem | Fix |
+|---|---|
+| GBA resets when the cartridge is inserted | Hold **Start + Select** while turning the GBA on with the cartridge already inserted |
+| "Waiting for a GBA in port 2..." never finishes | Check the cable is in **controller port 2** and firmly in the GBA's link port, and turn the GBA on without a cartridge. |
+| "No usable device found" | Check the SD card is FAT32 and inserted before starting the dumper |
+| "Storage device … not found, using … instead" | The device chosen in settings is missing. Insert it and restart, or change the device in settings. |
+| "No (Valid) GBA Card inserted!" | Clean the cartridge contacts and reseat it. The header check failed. |
+| "Game already dumped!" / "Save already backed up!" | A file with that name already exists. Change **If a file already exists** in the settings to Overwrite or Keep both. |
+| "Save has the wrong size" | The `.sav` file must be exactly the cartridge's save size. Emulator saves sometimes have extra bytes at the end. |
+| Wii: nothing happens | Only Wii models with GameCube controller ports can use the link cable |
+
+---
+
+## Roadmap
+
+Planned work includes save history with timestamps, a graphical interface, a library for browsing and restoring your dumps, and a progress bar, game info and button controls on the GBA screen. See [docs/ROADMAP.md](docs/ROADMAP.md) for the details and current status.
+
+## Contributing
+
+Issues and pull requests are welcome. Before opening a pull request:
+
+- make sure `./build.sh` builds both platforms with **no warnings**
+- make sure `make test` passes
+- follow the code style and module rules in [CLAUDE.md](CLAUDE.md) (C, tabs, module-prefixed function names, no screen/input access from `link/` or `storage/`)
+- mention what you've tested on real hardware
+
+## Credits
+
+- **[FIX94](https://github.com/FIX94)**: original GBA Link Cable Dumper
+- **Chishm**: SendSave, which the save support is based on
+- **Dark Fader**: GBA BIOS dumping method
+- **[devkitPro](https://devkitpro.org)**: devkitPPC, devkitARM, libogc, libgba and libfat
+- **Tom Vardy**: this fork (build system, restructure, storage devices, SD2SP2, settings)
+
+## License
+
+MIT. See [LICENSE](LICENSE).

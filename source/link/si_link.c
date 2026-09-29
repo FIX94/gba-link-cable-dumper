@@ -67,6 +67,8 @@ void si_link_reset(void)
 
 u8 si_link_status(void)
 {
+	//a failed transfer must not return an old status, e.g. with the GBA unplugged
+	memset(resbuf,0,32);
 	cmdbuf[0] = 0; //status
 	transval = 0;
 	SI_Transfer(SI_LINK_CHAN,cmdbuf,1,resbuf,3,transcb,SI_TRANS_DELAY);

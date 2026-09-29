@@ -19,6 +19,89 @@
 
 u8 save_data[GBA_MAX_SAVE_SIZE] __attribute__ ((section (".sbss")));
 
+//---------------------------------------------------------------------------------
+// requests posted by pressing a button on the GBA, see common/protocol.h
+//---------------------------------------------------------------------------------
+static bool request_posted = false;
+
+static void post_request(u32 code, const char *msg)
+{
+	REG_JOYTR = GBA_REQUEST_MAGIC | code;
+	REG_JSTAT |= GBA_JSTAT_REQUEST;
+	request_posted = true;
+	screen_status(msg);
+	screen_controls(NULL, NULL);
+}
+
+// takes the request down, JOYTR is reset first because the gc reads it
+// again as soon as it sees the status bit clear
+static void clear_request(void)
+{
+	REG_JOYTR = 0;
+	REG_JSTAT &= ~GBA_JSTAT_REQUEST;
+	request_posted = false;
+}
+
+// the gc read our request, clear only the read flag so a command
+// that arrives at the same time is not lost
+static void ack_request(void)
+{
+	REG_JOYTR = 0;
+	REG_HS_CTRL = JOY_READ;
+	REG_JSTAT &= ~GBA_JSTAT_REQUEST;
+	request_posted = false;
+}
+
+static void show_idle_controls(void)
+{
+	screen_controls("A: read cartridge", "SELECT: dump BIOS");
+}
+
+static void show_cart_controls(u32 savesize)
+{
+	if(savesize > 0)
+		screen_controls("A: dump ROM    B: cancel", "R:backup L:restore SEL:clear");
+	else
+		screen_controls("A: dump ROM    B: cancel", NULL);
+}
+
+// cart screen buttons, destructive ones need a second press
+// returns true once a choice was posted
+static bool handle_cart_keys(u32 savesize, u16 *confirm)
+{
+	scanKeys();
+	u16 down = keysDown();
+	if(!down)
+		return false;
+	if(down & KEY_A)
+		post_request(GBA_CMD_DUMP_ROM, "Starting ROM dump...");
+	else if(down & KEY_B)
+		post_request(GBA_CMD_NONE, "Cancelling...");
+	else if(savesize > 0 && (down & KEY_R))
+		post_request(GBA_CMD_BACKUP_SAVE, "Starting save backup...");
+	else if(savesize > 0 && (down & (KEY_L|KEY_SELECT)))
+	{
+		u16 key = (down & KEY_L) ? KEY_L : KEY_SELECT;
+		if(*confirm == key)
+		{
+			*confirm = 0;
+			if(key == KEY_L)
+				post_request(GBA_CMD_RESTORE_SAVE, "Starting save restore...");
+			else
+				post_request(GBA_CMD_CLEAR_SAVE, "Starting save clear...");
+		}
+		else
+		{
+			*confirm = key;
+			screen_status(key == KEY_L ? "Press L again to restore" : "Press SELECT again to clear");
+			return false;
+		}
+	}
+	else
+		return false;
+	return request_posted;
+}
+
 s32 getGameSize(void)
 {
 	if(*(vu32*)(0x08000004) != 0x51AEFF24)
@@ -56,6 +139,9 @@ int main(void) {
 
 	screen_init();
 	REG_JOYTR = 0;
+	//the bios may have left the general purpose flags set
+	REG_JSTAT = 0;
+	show_idle_controls();
 	u32 i;
 	progress_t progress;
 	// disable this, needs power
@@ -66,9 +152,19 @@ int main(void) {
 	//clear out previous messages
 	REG_HS_CTRL |= JOY_RW;
 	while (1) {
-		if(REG_HS_CTRL&JOY_READ)
+		if((REG_HS_CTRL&JOY_READ) && request_posted)
+		{
+			//the gc took our request, it acts on it next and may refuse it,
+			//so go back to ready until its command arrives
+			ack_request();
+			screen_status("Ready");
+			show_idle_controls();
+		}
+		else if(REG_HS_CTRL&JOY_READ)
 		{
 			REG_HS_CTRL |= JOY_RW;
+			screen_status("Reading cartridge...");
+			screen_controls(NULL, NULL);
 			s32 gamesize = getGameSize();
 			u32 savesize = SaveSize(save_data,gamesize);
 			REG_JOYTR = gamesize;
@@ -83,6 +179,8 @@ int main(void) {
 			{
 				REG_JOYTR = 0;
 				screen_cart(NULL, -1, 0);
+				screen_status("Ready");
+				show_idle_controls();
 				continue; //nothing to read
 			}
 			//game in, send header
@@ -95,15 +193,31 @@ int main(void) {
 			REG_JOYTR = 0;
 			//the gc side waits for the user now, so there is time to draw
 			screen_cart((const u8*)0x08000000, gamesize, savesize);
-			screen_status("Choose an action on the TV");
-			//wait for other side to choose
-			while((REG_HS_CTRL&JOY_WRITE) == 0) ;
+			screen_status("Choose on the GBA or TV");
+			show_cart_controls(savesize);
+			//wait for other side to choose, the choice can also be made here
+			u16 confirm = 0;
+			while((REG_HS_CTRL&JOY_WRITE) == 0)
+			{
+				if(request_posted)
+				{
+					if(REG_HS_CTRL&JOY_READ)
+						ack_request();
+				}
+				else
+					handle_cart_keys(savesize, &confirm);
+			}
+			//chosen on the gc at the same time, drop ours
+			if(request_posted)
+				clear_request();
 			REG_HS_CTRL |= JOY_RW;
+			screen_controls(NULL, NULL);
 			u32 choseval = REG_JOYRE;
 			if(choseval == GBA_CMD_NONE)
 			{
 				REG_JOYTR = 0;
-				screen_status("Ready, look at the TV");
+				screen_status("Ready");
+				show_idle_controls();
 				continue; //nothing to read
 			}
 			else if(choseval == GBA_CMD_DUMP_ROM)
@@ -239,9 +353,13 @@ int main(void) {
 				REG_HS_CTRL |= JOY_RW;
 			}
 			REG_JOYTR = 0;
+			show_idle_controls();
 		}
 		else if(REG_HS_CTRL&JOY_WRITE)
 		{
+			//a command from the gc wins over a request we posted meanwhile
+			if(request_posted)
+				clear_request();
 			REG_HS_CTRL |= JOY_RW;
 			u32 choseval = REG_JOYRE;
 			if(choseval == GBA_CMD_DUMP_BIOS)
@@ -271,6 +389,16 @@ int main(void) {
 				screen_status_line("BIOS dumped!");
 			}
 			REG_JOYTR = 0;
+			show_idle_controls();
+		}
+		else if(!request_posted)
+		{
+			scanKeys();
+			u16 down = keysDown();
+			if(down & KEY_A)
+				post_request(GBA_REQ_READ_CART, "Waiting for the GameCube...");
+			else if(down & KEY_SELECT)
+				post_request(GBA_REQ_DUMP_BIOS, "Waiting for the GameCube...");
 		}
 		Halt();
 	}

@@ -20,6 +20,8 @@ void screen_cart(const u8 *header, s32 gamesize, u32 savesize);
 void screen_status(const char *msg);
 // replaces the status text but keeps the progress bar, e.g. for "Done!"
 void screen_status_line(const char *msg);
+// the GBA button hints at the bottom, NULL lines are left empty
+void screen_controls(const char *line1, const char *line2);
 
 // progress bar, safe to call inside transfer loops:
 // progress_update only compares and writes a few map entries,

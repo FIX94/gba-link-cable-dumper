@@ -26,6 +26,7 @@ This is a continued fork of [FIX94's GBA Link Cable Dumper](https://github.com/F
 - **Portable settings file**: `settings.ini` can live in the default folder or anywhere you choose.
 - **Safe writing**: the card is checked before every write and existing dumps are never overwritten unless you ask for that.
 - **Game info and a progress bar on the GBA screen**: title, game code, ROM size and detected save type as soon as the cartridge is read, plus a live progress bar during every transfer.
+- **Control it from the GBA**: read the cartridge, dump the ROM or BIOS, and back up, restore or clear saves with the GBA's buttons. Restoring and clearing need a second press to confirm. Everything is mirrored on the TV.
 - **No setup on the GBA**: the dumper is sent to the GBA over the cable (multiboot), so the GBA only needs to be switched on.
 
 ---
@@ -57,26 +58,29 @@ Download the latest `.dol` for your console from the [Releases](../../releases) 
 1. Plug a GameCube controller into **port 1** and the GBA link cable into **port 2**.
 2. Start the dumper on your console. The screen shows which device and folder dumps will be saved to.
 3. Connect the link cable to the GBA and turn the GBA on **without a cartridge**. The dumper is sent to it automatically, and the GBA screen says "Ready, look at the TV".
-4. Insert the cartridge into the GBA and press **A** on the controller.
-5. The game's name, ID, ROM size and save size are shown on the TV, and the title, code, ROM size and save type on the GBA. Choose what to do:
+4. Insert the cartridge into the GBA and press **A** on the controller **or on the GBA**.
+5. The game's name, ID, ROM size and save size are shown on the TV, and the title, code, ROM size and save type on the GBA. Choose what to do, with either the GameCube controller or the GBA:
 
-   | Button | Action |
-   |---|---|
-   | **A** | Dump the ROM |
-   | **B** | Cancel |
-   | **Y** | Back up the save |
-   | **X** | Restore the save from the SD card to the cartridge |
-   | **Z** | Clear the save on the cartridge |
+   | Action | GameCube controller | GBA |
+   |---|---|---|
+   | Dump the ROM | **A** | **A** |
+   | Cancel | **B** | **B** |
+   | Back up the save | **Y** | **R** |
+   | Restore the save from the SD card to the cartridge | **X** | **L**, then **L** again to confirm |
+   | Clear the save on the cartridge | **Z** | **SELECT**, then **SELECT** again to confirm |
 
    The GBA shows what it's doing and a progress bar with a percentage for ROM dumps, save transfers and BIOS dumps.
 
 6. Other buttons:
 
-   | Button | Where | Action |
+   | Action | GameCube controller | GBA |
    |---|---|---|
-   | **Y** | main menu | Dump the GBA BIOS |
-   | **X** | waiting screen or main menu | Open settings |
-   | **Start** | anywhere | Exit |
+   | Read the cartridge | **A** (main menu) | **A** |
+   | Dump the GBA BIOS | **Y** (main menu) | **SELECT** |
+   | Open settings | **X** (waiting screen or main menu) | |
+   | Exit | **Start** | |
+
+   The GBA screen always shows which of its buttons do something right now.
 
 > **The GBA resets when you insert the cartridge?** Turn the GBA off, insert the cartridge, then hold **Start + Select** while turning it on. This skips the game's boot, and the dumper can then be sent as normal.
 
@@ -184,6 +188,11 @@ If you move the settings file from the settings screen, a small pointer file (`s
    - identifies the save type by searching the ROM for the save library ID strings that Nintendo's SDK builds into every game (`EEPROM_V`, `SRAM_V`, `FLASH_V`, `FLASH512_V`, `FLASH1M_V`)
    - sends the sizes and the 192-byte ROM header to the console
 3. **Commands.** The console sends a command number: dump ROM, back up, restore or clear the save, or dump the BIOS. The numbers are defined once in [`common/protocol.h`](common/protocol.h), which both programs use.
+   - **Buttons on the GBA.** The console controls the cable, and even a single read of the GBA's data register tells the payload to start reading the cartridge. So a button press on the GBA can't simply be placed where the console will read it. Instead:
+     1. The payload puts a request (a `"GB"` magic value plus the action) into its data register and sets a spare general-purpose bit in its link status register.
+     2. Every frame the console sends a *status* query, which the GBA doesn't react to. When it sees the bit, it reads the request.
+     3. The console waits for the payload to clear the bit, after resetting its data register first, then acts on the request as if its own controller had been pressed.
+     4. If both sides act at once, the console's command wins and the GBA drops its request.
 4. **Transfers.** Data moves 4 bytes at a time over the JOY Bus. The GBA disables interrupts during a transfer to keep the timing exact. Saves are read and written with each chip's own protocol (EEPROM, SRAM, Flash), using code from Chishm's SendSave. The GBA doesn't let programs read the BIOS directly, so it's dumped with Dark Fader's trick of reading it back through a BIOS sound function.
 
 The payload is embedded in the `.dol` at build time, so the console side and GBA side always come from the same build and match.

@@ -72,8 +72,11 @@ int main(int argc, char *argv[])
 	memcpy(header+0xA0, "POKEMON SAPP", 12); memcpy(header+0xAC, "AXPE", 4); memcpy(header+0xB0, "01", 2); header[0xBC] = 1;
 	progress_t p;
 
-	screen_init(); dump("1_ready.bin");
-	screen_cart(header, 16<<20, 0x20000); screen_status("Choose an action on the TV"); dump("2_cart.bin");
+	screen_init(); screen_controls("A: read cartridge", "SELECT: dump BIOS"); dump("1_ready.bin");
+	screen_cart(header, 16<<20, 0x20000); screen_status("Choose on the GBA or TV");
+	screen_controls("A: dump ROM    B: cancel", "R:backup L:restore SEL:clear"); dump("2_cart.bin");
+	screen_status("Press SELECT again to clear"); dump("2b_confirm.bin");
+	screen_controls(NULL, NULL);
 	u16 *map = (u16*)(fake_vram + 4*0x800);
 	CHECK((map[5*32+2] & 0xFF) == 'T' && (map[5*32+9] & 0xFF) == 'P');
 
@@ -92,7 +95,7 @@ int main(int argc, char *argv[])
 	for(unsigned k = 0; k < sizeof(sizes)/sizeof(sizes[0]); k++)
 		check_size(sizes[k]);
 
-	screen_cart(NULL, -1, 0); screen_status("Ready, look at the TV"); dump("5_no_cart.bin");
+	screen_cart(NULL, -1, 0); screen_status("Ready"); screen_controls("A: read cartridge", "SELECT: dump BIOS"); dump("5_no_cart.bin");
 	CHECK((map[14*32+2] & 0xFF) == ' ');
 
 	printf(fails ? "\n%d FAILED\n" : "\nALL PASSED\n", fails);

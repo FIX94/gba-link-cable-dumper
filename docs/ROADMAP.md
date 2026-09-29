@@ -51,7 +51,8 @@ Everything the GUI and file manager need underneath them.
 - ✅ Show which device is in use on the waiting and main screens
 - ✅ Check the active card is still inserted before every write, remount it or show an error instead of failing mid-write
 - ⬜ Rescan for devices inserted after startup (currently only devices present at startup can be chosen)
-- ⬜ **Test on hardware**: SD2SP2, SD Gecko A/B, Wii SD, USB
+- 🚧 **Test on hardware**: ✅ SD2SP2 on GameCube via Swiss (settings, subfolders, save backup); ⬜ SD Gecko A/B, Wii SD, USB
+- Note: Swiss does not pass the dol's location (argv), so settings next to the dol only apply with loaders that do (e.g. the Homebrew Channel)
 
 > The SD2SP2 sits in Serial Port 2 on the bottom of the GameCube (EXI bus). It does not clash with the link cable, which uses controller port 2 (SI bus).
 

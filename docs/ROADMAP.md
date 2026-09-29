@@ -144,9 +144,11 @@ The program uploaded to the GBA (`gba/source/main.c`) currently just says "Pleas
 - ⬜ Time a 16 MB dump against v1.7 to confirm the bar doesn't slow it down (~24 minutes expected)
 
 ### Controls on the GBA
-- ⬜ Let the user start actions from the GBA buttons (e.g. A: dump ROM, B: back up save, Start: cancel)
-- ⬜ Needs a **protocol change**: at the moment the console always asks and the GBA answers. Add a "GBA request" message that the GBA posts while idle and the console reads when it polls.
-- ⬜ The console's UI mirrors actions started on the GBA (the console still writes the files)
+- ✅ Start actions from the GBA buttons: main screen A = read cartridge, SELECT = dump BIOS. Cart screen: A = dump ROM, B = cancel, R = back up save, L = restore, SELECT = clear (restore and clear need a second press).
+- ✅ **Protocol change**: the GBA posts a request (`"GB"` magic + code in JOYTR, plus a general purpose JOYSTAT bit). The console polls with the side-effect-free status command, reads the request, then waits for the GBA to take it down. Collisions: a console command wins, and a GC "ready" read that picks up a request waits and retries.
+- ✅ The console's UI mirrors actions started on the GBA ("Chosen on the GBA: …"), and the console still writes the files
+- ⬜ **Test on hardware**, including pressing buttons on both at the same time
+- ⬜ Settings screen control from the GBA (not planned unless asked for)
 - ⬜ Cancel: split long transfers into acknowledged blocks so either side can stop cleanly
 
 ### Protocol notes

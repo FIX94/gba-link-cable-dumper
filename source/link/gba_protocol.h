@@ -31,6 +31,10 @@ typedef bool (*gba_chunk_cb)(const u8 *data, u32 len, void *user);
 
 // payload is idle and ready for a new command
 bool gba_is_ready(void);
+// checks for a button pressed on the GBA (see common/protocol.h), without
+// side effects when there is none; returns true with the request code
+// (GBA_REQ_* in the main menu, GBA_CMD_* on the cart screen)
+bool gba_poll_request(u32 *code);
 // asks the payload for cart info, returns false if no (valid) cart is inserted
 bool gba_read_cart_info(gba_cart_info *info);
 // sends the chosen command after gba_read_cart_info, GBA_CMD_NONE cancels

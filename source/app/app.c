@@ -87,6 +87,18 @@ static bool connect_gba(void)
 	return true;
 }
 
+static const char *command_name(u32 cmd)
+{
+	switch(cmd)
+	{
+		case GBA_CMD_DUMP_ROM:		return "Dump ROM";
+		case GBA_CMD_BACKUP_SAVE:	return "Back up save";
+		case GBA_CMD_RESTORE_SAVE:	return "Restore save";
+		case GBA_CMD_CLEAR_SAVE:	return "Clear save";
+		default:					return "Cancel";
+	}
+}
+
 static u32 choose_cart_command(const gba_cart_info *cart)
 {
 	while(1)
@@ -94,6 +106,16 @@ static u32 choose_cart_command(const gba_cart_info *cart)
 		input_scan();
 		ui_frame();
 		u32 btns = input_down();
+		u32 req;
+		if(!btns && gba_poll_request(&req))
+		{
+			bool save_cmd = req == GBA_CMD_BACKUP_SAVE || req == GBA_CMD_RESTORE_SAVE || req == GBA_CMD_CLEAR_SAVE;
+			if(req <= GBA_CMD_CLEAR_SAVE && (!save_cmd || cart->save_size > 0))
+			{
+				ui_status("Chosen on the GBA: %s\n", command_name(req));
+				return req;
+			}
+		}
 		if(btns&INPUT_START)
 			ui_exit();
 		else if(btns&INPUT_A)
@@ -284,16 +306,19 @@ static void run_menu(void)
 		input_scan();
 		ui_frame();
 		u32 btns = input_down();
+		u32 req = 0;
+		if(!btns && !gba_poll_request(&req))
+			req = 0;
 		if(btns&INPUT_START)
 			ui_exit();
 		else if(btns&INPUT_X)
 			settings_menu_run();
-		else if(btns&INPUT_A)
+		else if((btns&INPUT_A) || req == GBA_REQ_READ_CART)
 		{
 			if(gba_is_ready())
 				handle_cart();
 		}
-		else if(btns&INPUT_Y)
+		else if((btns&INPUT_Y) || req == GBA_REQ_DUMP_BIOS)
 			dump_bios();
 	}
 }

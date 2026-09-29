@@ -9,9 +9,45 @@
 #include "link/si_link.h"
 #include "link/gba_protocol.h"
 
+// frames to wait for the GBA to take a request down, it checks every vblank
+#define REQUEST_ACK_FRAMES 120
+
+static bool wait_request_cleared(void)
+{
+	int frames;
+	for(frames = 0; frames < REQUEST_ACK_FRAMES; frames++)
+	{
+		if(!(si_link_status() & GBA_JSTAT_REQUEST))
+			return true;
+		VIDEO_WaitVSync();
+	}
+	return false;
+}
+
 bool gba_is_ready(void)
 {
-	return si_link_recv() == 0;
+	u32 val = __builtin_bswap32(si_link_recv());
+	if(val == 0)
+		return true;
+	//a button was pressed on the GBA at the same time, our read took its
+	//request instead, so wait for it to reset and ask again
+	if((val & GBA_REQUEST_MASK) == GBA_REQUEST_MAGIC && wait_request_cleared())
+		return si_link_recv() == 0;
+	return false;
+}
+
+bool gba_poll_request(u32 *code)
+{
+	if(!(si_link_status() & GBA_JSTAT_REQUEST))
+		return false;
+	u32 val = __builtin_bswap32(si_link_recv());
+	//the GBA resets JOYTR before clearing the bit, so the next read is clean
+	if(!wait_request_cleared())
+		return false;
+	if((val & GBA_REQUEST_MASK) != GBA_REQUEST_MAGIC)
+		return false;
+	*code = val & ~GBA_REQUEST_MASK;
+	return true;
 }
 
 bool gba_read_cart_info(gba_cart_info *info)

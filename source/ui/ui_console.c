@@ -126,7 +126,8 @@ void ui_show_main_menu(void)
 {
 	printf("Press A once you have a GBA Game inserted.\n");
 	printf("Press Y to backup the GBA BIOS.\n");
-	printf("Press X for settings.\n \n");
+	printf("Press X for settings.\n");
+	printf("You can also use the buttons shown on the GBA.\n \n");
 }
 
 void ui_show_cart_info(const gba_cart_info *cart)

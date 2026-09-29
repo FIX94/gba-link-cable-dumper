@@ -29,6 +29,7 @@
 #define ROW_STATUS		12
 #define ROW_BAR			14
 #define ROW_PCT			15
+#define ROW_CONTROLS	16
 #define BAR_COL			2
 #define BAR_CELLS		26
 #define PCT_COL			13
@@ -77,8 +78,7 @@ void screen_init(void)
 	make_bar_tile(TILE_EMPTY, 2);
 	put_line(1, "GBA Link Cable Dumper " APP_VERSION);
 	put_line(2, "--------------------------");
-	put_line(18, "Use the GameCube controller");
-	screen_status("Ready, look at the TV");
+	screen_status("Ready");
 }
 
 static const char *save_type_name(u32 savesize)
@@ -139,6 +139,20 @@ void screen_status(const char *msg)
 void screen_status_line(const char *msg)
 {
 	put_line(ROW_STATUS, msg);
+}
+
+void screen_controls(const char *line1, const char *line2)
+{
+	const char *lines[2] = { line1, line2 };
+	int i;
+	//a blank row between the lines, the font has no line spacing
+	for(i = 0; i < 2; i++)
+	{
+		if(lines[i])
+			put_line(ROW_CONTROLS+i*2, lines[i]);
+		else
+			clear_row(ROW_CONTROLS+i*2);
+	}
 }
 
 static void draw_pct(const progress_t *p)

@@ -21,6 +21,7 @@ enum
 	ITEM_DUMP_DIR,
 	ITEM_SPLIT,
 	ITEM_EXISTING,
+	ITEM_SAVE_NAMES,
 	ITEM_SETTINGS_FILE,
 	ITEM_BACK,
 	ITEM_COUNT
@@ -114,6 +115,7 @@ void settings_menu_run(void)
 			items[ITEM_DUMP_DIR] = (ui_menu_item){ "Output folder", paths_dump_dir() };
 			items[ITEM_SPLIT] = (ui_menu_item){ "ROMs/Saves/BIOS subfolders", split };
 			items[ITEM_EXISTING] = (ui_menu_item){ "If a file already exists", existing_labels[s->existing] };
+			items[ITEM_SAVE_NAMES] = (ui_menu_item){ "Save backup names", s->timestamp_saves ? "Date and time" : "Plain" };
 			items[ITEM_SETTINGS_FILE] = (ui_menu_item){ "Settings file", settings_path };
 			items[ITEM_BACK] = (ui_menu_item){ "Save and go back", NULL };
 			ui_draw_menu("Settings", items, ITEM_COUNT, cursor,
@@ -148,6 +150,9 @@ void settings_menu_run(void)
 					break;
 				case ITEM_EXISTING:
 					s->existing = (s->existing + 3 + dir) % 3;
+					break;
+				case ITEM_SAVE_NAMES:
+					s->timestamp_saves = !s->timestamp_saves;
 					break;
 				case ITEM_SETTINGS_FILE:
 					if(btns & INPUT_A)

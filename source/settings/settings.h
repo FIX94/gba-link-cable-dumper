@@ -24,6 +24,7 @@ typedef struct
 	char dump_dir[PATH_MAX];	// without the device, e.g. "/dumps"
 	bool split_folders;
 	paths_existing existing;
+	bool timestamp_saves;		// date and time in save backup names
 } settings_t;
 
 settings_t *settings_get(void);

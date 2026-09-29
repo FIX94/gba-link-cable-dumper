@@ -30,7 +30,7 @@ Everything the GUI and file manager need underneath them.
   - ✅ output folder
   - ✅ separate subfolders for ROMs, saves and BIOS (`ROMs/`, `Saves/`, `BIOS/`)
   - ✅ what to do when a file already exists: **skip** (the original behaviour), **overwrite** or **keep both** (adds `(1)`, `(2)` …)
-  - ⬜ keep save history: each backup is timestamped instead of skipped, so older saves are never lost
+  - ✅ keep save history: save backups get the date and time in their name (`save_names=timestamp`, default), so older saves are never lost; restore uses the newest backup by modification time
 - ✅ Settings screen in the console UI (X on the waiting screen or main menu), drawn through `ui_draw_menu` so the GUI can reuse it
 - ✅ Host tests for settings, INI parsing and paths (`make test`)
 

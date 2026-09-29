@@ -44,6 +44,8 @@ void ui_show_waiting_help(void);
 void ui_show_main_menu(void);
 void ui_show_cart_info(const gba_cart_info *cart);
 void ui_show_cart_menu(const gba_cart_info *cart);
+// the backup a restore would use, NULL when there is none
+void ui_show_restore_file(const char *path);
 void ui_rom_progress(u32 bytes_done, u32 bytes_total);
 
 #endif

@@ -9,6 +9,7 @@
 
 #include <stddef.h>
 #include <stdbool.h>
+#include <time.h>
 #include "link/gba_protocol.h"
 
 #define PATHS_DEFAULT_DUMP_DIR "/dumps"
@@ -39,6 +40,12 @@ bool paths_create_dirs(void);
 
 // "<kind dir>/<title> [<game code><maker code>]<ext>"
 void paths_cart_file(char *out, size_t len, const gba_cart_info *cart, paths_kind kind);
+// save backup name, with when: "<saves dir>/<title> [<code>] 2026-09-29 18-45-12.sav"
+// without (NULL) the same as paths_cart_file
+void paths_save_backup_file(char *out, size_t len, const gba_cart_info *cart, const struct tm *when);
+// finds the newest save backup of this cart by modification time, whatever
+// its name style (plain, timestamped or " (n)"), returns false if there is none
+bool paths_find_latest_save(char *out, size_t len, const gba_cart_info *cart);
 void paths_bios_file(char *out, size_t len);
 
 // applies the policy to a path that is about to be written

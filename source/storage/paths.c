@@ -6,6 +6,7 @@
  */
 #include <stdio.h>
 #include <string.h>
+#include <strings.h>
 #include <limits.h>
 #include "storage/storage.h"
 #include "storage/paths.h"
@@ -79,14 +80,98 @@ static int kind_dir_prefix(char *out, size_t len, paths_kind kind)
 	return dirlen;
 }
 
+// "<title> [<game code><maker code>]", sanitized
+static void cart_base_name(char *out, size_t len, const gba_cart_info *cart)
+{
+	snprintf(out, len, "%.12s [%.4s%.2s]",
+		GBA_CART_TITLE(cart), GBA_CART_GAME_CODE(cart), GBA_CART_MAKER_CODE(cart));
+	paths_sanitize_filename(out);
+}
+
 void paths_cart_file(char *out, size_t len, const gba_cart_info *cart, paths_kind kind)
 {
 	int dirlen = kind_dir_prefix(out, len, kind);
 	if((size_t)dirlen >= len)
 		return;
-	snprintf(out+dirlen, len-dirlen, "%.12s [%.4s%.2s]%s",
-		GBA_CART_TITLE(cart), GBA_CART_GAME_CODE(cart), GBA_CART_MAKER_CODE(cart), kind_ext[kind]);
-	paths_sanitize_filename(out+dirlen); //fix name behind the dump dir
+	char base[64];
+	cart_base_name(base, sizeof(base), cart);
+	snprintf(out+dirlen, len-dirlen, "%s%s", base, kind_ext[kind]);
+}
+
+void paths_save_backup_file(char *out, size_t len, const gba_cart_info *cart, const struct tm *when)
+{
+	if(!when)
+	{
+		paths_cart_file(out, len, cart, PATHS_KIND_SAVE);
+		return;
+	}
+	int dirlen = kind_dir_prefix(out, len, PATHS_KIND_SAVE);
+	if((size_t)dirlen >= len)
+		return;
+	char base[64];
+	cart_base_name(base, sizeof(base), cart);
+	//no colons on FAT, and this order sorts by date
+	snprintf(out+dirlen, len-dirlen, "%s %04d-%02d-%02d %02d-%02d-%02d%s", base,
+		when->tm_year + 1900, when->tm_mon + 1, when->tm_mday,
+		when->tm_hour, when->tm_min, when->tm_sec, kind_ext[PATHS_KIND_SAVE]);
+}
+
+typedef struct
+{
+	const char *base;
+	size_t base_len;
+	char best[NAME_MAX+1];
+	time_t best_mtime;
+	bool found;
+} latest_ctx;
+
+static bool has_save_ext(const char *name)
+{
+	size_t len = strlen(name);
+	return len >= 4 && strcasecmp(name + len - 4, kind_ext[PATHS_KIND_SAVE]) == 0;
+}
+
+static void check_latest(const char *name, time_t mtime, void *user)
+{
+	latest_ctx *ctx = user;
+	//"<base>.sav", "<base> <anything>.sav"
+	if(strncmp(name, ctx->base, ctx->base_len) != 0 || !has_save_ext(name))
+		return;
+	char next = name[ctx->base_len];
+	if(next != '.' && next != ' ')
+		return;
+	//too long to keep, it could not be opened reliably anyway
+	if(strlen(name) >= sizeof(ctx->best))
+		return;
+	//newest wins, the name breaks ties so timestamped names still order
+	if(!ctx->found || mtime > ctx->best_mtime ||
+		(mtime == ctx->best_mtime && strcmp(name, ctx->best) > 0))
+	{
+		if(snprintf(ctx->best, sizeof(ctx->best), "%s", name) >= (int)sizeof(ctx->best))
+			return;
+		ctx->best_mtime = mtime;
+		ctx->found = true;
+	}
+}
+
+bool paths_find_latest_save(char *out, size_t len, const gba_cart_info *cart)
+{
+	char dir[PATH_MAX];
+	paths_kind_dir(dir, sizeof(dir), PATHS_KIND_SAVE);
+	if(!dir[0])
+		return false;
+	char base[64];
+	cart_base_name(base, sizeof(base), cart);
+	latest_ctx ctx;
+	ctx.base = base;
+	ctx.base_len = strlen(base);
+	ctx.found = false;
+	storage_list_files(dir, check_latest, &ctx);
+	if(!ctx.found)
+		return false;
+	size_t dirlen = strlen(dir);
+	int n = snprintf(out, len, "%s%s%s", dir, (dirlen > 0 && dir[dirlen-1] == '/') ? "" : "/", ctx.best);
+	return n > 0 && (size_t)n < len;
 }
 
 void paths_bios_file(char *out, size_t len)

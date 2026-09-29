@@ -202,6 +202,27 @@ long storage_read_file(const char *path, void *buf, size_t expected_size)
 	return readsize;
 }
 
+bool storage_list_files(const char *path, storage_file_cb cb, void *user)
+{
+	DIR *dir = opendir(path);
+	if(!dir)
+		return false;
+	struct dirent *ent;
+	char full[PATH_MAX];
+	while((ent = readdir(dir)) != NULL)
+	{
+		if(ent->d_type != DT_REG)
+			continue;
+		int n = snprintf(full, sizeof(full), "%s/%s", path, ent->d_name);
+		if(n < 0 || (size_t)n >= sizeof(full))
+			continue;
+		struct stat st;
+		cb(ent->d_name, stat(full, &st) == 0 ? st.st_mtime : 0, user);
+	}
+	closedir(dir);
+	return true;
+}
+
 bool storage_list_dirs(const char *path, storage_dir_cb cb, void *user)
 {
 	DIR *dir = opendir(path);

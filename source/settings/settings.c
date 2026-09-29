@@ -59,6 +59,8 @@ static void load_entry(const char *key, const char *value, void *user)
 				s->existing = i;
 		}
 	}
+	else if(strcmp(key, "save_names") == 0)
+		s->timestamp_saves = strcasecmp(value, "plain") != 0;
 	else if(strcmp(key, POINTER_KEY) == 0)
 		snprintf(ctx->pointer, sizeof(ctx->pointer), "%s", value);
 }
@@ -128,6 +130,7 @@ void settings_defaults(settings_t *s)
 	snprintf(s->dump_dir, sizeof(s->dump_dir), PATHS_DEFAULT_DUMP_DIR);
 	s->split_folders = false;
 	s->existing = PATHS_EXISTING_SKIP;
+	s->timestamp_saves = true;
 }
 
 bool settings_load(const char *app_path)
@@ -210,6 +213,8 @@ bool settings_save(void)
 	fprintf(f, "split_folders=%d\n", settings.split_folders ? 1 : 0);
 	fprintf(f, "; existing_files: skip, overwrite or keep_both\n");
 	fprintf(f, "existing_files=%s\n", existing_names[settings.existing]);
+	fprintf(f, "; save_names: timestamp adds the date and time to save backups, or plain\n");
+	fprintf(f, "save_names=%s\n", settings.timestamp_saves ? "timestamp" : "plain");
 	fclose(f);
 	if(!found_path[0])
 		snprintf(found_path, sizeof(found_path), "%s", settings_path);

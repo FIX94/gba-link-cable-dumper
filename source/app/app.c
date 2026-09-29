@@ -9,6 +9,7 @@
 #include <malloc.h>
 #include <unistd.h>
 #include <limits.h>
+#include <time.h>
 #include "protocol.h"
 #include "gba_mb_gba.h"
 #include "app/app.h"
@@ -134,10 +135,24 @@ static u32 choose_cart_command(const gba_cart_info *cart)
 	}
 }
 
+// plain or with the current date and time, depending on the settings
+static void backup_save_name(char *out, size_t len, const gba_cart_info *cart)
+{
+	if(!settings_get()->timestamp_saves)
+	{
+		paths_save_backup_file(out, len, cart, NULL);
+		return;
+	}
+	time_t now = time(NULL);
+	struct tm when;
+	localtime_r(&now, &when);
+	paths_save_backup_file(out, len, cart, &when);
+}
+
 // checks the command can run before the GBA is told about it,
 // returns GBA_CMD_NONE if it can not
 static u32 prepare_cart_command(u32 command, const gba_cart_info *cart,
-	char *gamename, char *savename)
+	char *gamename, char *savename, const char *restorename)
 {
 	if(command != GBA_CMD_NONE && command != GBA_CMD_CLEAR_SAVE && !check_storage())
 		return GBA_CMD_NONE;
@@ -160,7 +175,7 @@ static u32 prepare_cart_command(u32 command, const gba_cart_info *cart,
 	}
 	else if(command == GBA_CMD_RESTORE_SAVE)
 	{
-		long readsize = storage_read_file(savename, dumpbuf, cart->save_size);
+		long readsize = restorename ? storage_read_file(restorename, dumpbuf, cart->save_size) : -1;
 		if(readsize < 0)
 		{
 			ui_warn("ERROR: No Save to restore!\n");
@@ -242,11 +257,15 @@ static void handle_cart(void)
 	ui_show_cart_info(&cart);
 	char gamename[PATH_MAX];
 	char savename[PATH_MAX];
+	char restorename[PATH_MAX];
 	paths_cart_file(gamename, sizeof(gamename), &cart, PATHS_KIND_ROM);
-	paths_cart_file(savename, sizeof(savename), &cart, PATHS_KIND_SAVE);
+	backup_save_name(savename, sizeof(savename), &cart);
+	bool have_backup = cart.save_size > 0 && paths_find_latest_save(restorename, sizeof(restorename), &cart);
+	if(cart.save_size > 0)
+		ui_show_restore_file(have_backup ? restorename : NULL);
 	ui_show_cart_menu(&cart);
 	u32 command = choose_cart_command(&cart);
-	command = prepare_cart_command(command, &cart, gamename, savename);
+	command = prepare_cart_command(command, &cart, gamename, savename, have_backup ? restorename : NULL);
 	gba_send_command(command);
 	//let gba prepare
 	sleep(1);

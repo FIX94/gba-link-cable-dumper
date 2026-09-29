@@ -9,6 +9,7 @@
 
 #include <gccore.h>
 #include <stddef.h>
+#include <time.h>
 
 #define STORAGE_AUTO "auto"
 
@@ -49,5 +50,10 @@ long storage_read_file(const char *path, void *buf, size_t expected_size);
 // returns false if path could not be opened
 typedef void (*storage_dir_cb)(const char *name, void *user);
 bool storage_list_dirs(const char *path, storage_dir_cb cb, void *user);
+
+// calls cb for each regular file in path with its modification time
+// returns false if path could not be opened
+typedef void (*storage_file_cb)(const char *name, time_t mtime, void *user);
+bool storage_list_files(const char *path, storage_file_cb cb, void *user);
 
 #endif

@@ -9,6 +9,7 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <string.h>
 #include "version.h"
 #include "ui/ui.h"
 
@@ -140,6 +141,18 @@ void ui_show_cart_info(const gba_cart_info *cart)
 		printf("Save Size: %02.02f KB\n \n",((float)(cart->save_size))/1024.f);
 	else
 		printf("No Save File\n \n");
+}
+
+void ui_show_restore_file(const char *path)
+{
+	if(path)
+	{
+		//just the file name, the folder is shown at the top
+		const char *name = strrchr(path, '/');
+		printf("Restore uses: %s\n \n", name ? name+1 : path);
+	}
+	else
+		printf("No save backup to restore yet.\n \n");
 }
 
 void ui_show_cart_menu(const gba_cart_info *cart)

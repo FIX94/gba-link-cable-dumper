@@ -7,6 +7,7 @@
 #   make wii      build only the Wii dol
 #   make gba      build only the GBA multiboot payload
 #   make test     run the host tests (no devkitPro needed)
+#   make screens  render the GBA payload screens to tests/build/screens
 #   make clean    remove all build output
 #---------------------------------------------------------------------------------
 export DEVKITPRO	?=	/opt/devkitpro
@@ -15,7 +16,7 @@ export DEVKITPPC	?=	$(DEVKITPRO)/devkitPPC
 
 GBA_PAYLOAD	:=	data/gba_mb.gba
 
-.PHONY: all gba gc wii test clean
+.PHONY: all gba gc wii test screens clean
 
 all: gc wii
 
@@ -34,6 +35,9 @@ wii: $(GBA_PAYLOAD)
 
 test:
 	@$(MAKE) --no-print-directory -C tests
+
+screens:
+	@$(MAKE) --no-print-directory -C tests screens
 
 clean:
 	@$(MAKE) --no-print-directory -C tests clean

@@ -13,7 +13,8 @@ Planned work is in [docs/ROADMAP.md](docs/ROADMAP.md). Update its status markers
 ./build.sh gc       # GameCube only
 ./build.sh wii      # Wii only
 ./build.sh clean
-make test           # host tests (settings, ini, paths, storage) with the normal Mac compiler
+make test           # host tests (settings, ini, paths, storage, GBA progress bar) with the normal Mac compiler
+make screens        # render the GBA payload screens to tests/build/screens/*.png (check layout after GBA UI changes)
 ```
 
 - The toolchain is in `/opt/devkitpro` (devkitPPC r47, libogc 2.13, devkitARM r66). `build.sh` sets `DEVKITPRO`/`DEVKITPPC`/`DEVKITARM` if they're unset.
@@ -46,6 +47,8 @@ gba/source/         GBA payload (main.c) and libSave (save chip access)
 - Before writing a file, call `storage_check()` and `paths_resolve_existing()` (the existing-file setting). Do this **before** sending the command to the GBA so a failure doesn't leave the protocol half-way.
 - Menus/lists are drawn with `ui_draw_menu()`. Screens own their state and input loop in `app/`.
 - Check `snprintf` results when building paths. A cut-off path must fail, not point somewhere else.
+- **GBA transfer timing:** the GC reads/sends each word without checking the GBA is ready (~345 µs, ~5,800 cycles per word). Anything inside a transfer loop in `gba/source/main.c` must be tiny: use `progress_update()` (inline compare, direct map writes), never `iprintf`/`siprintf` or division. Draw status text and call `progress_start()` **before** the handshake that starts a stream (the GC starts straight after it). After GBA screen changes, run `make screens` and look at the PNGs.
+- GBA screen text is written directly to the console map (`screen.c` `put_line`), not with `\x1b[` escape codes. Lines are 28 characters max (columns 2–29).
 - GBA payload constraints: multiboot image ≤ 256 KB. Interrupts are disabled during transfers (`REG_IME = 0`), so don't rely on vblank IRQs there. The GBA side waits in busy loops on `REG_HS_CTRL`.
 - SI timing: `SI_TRANS_DELAY` of 50 µs is the lowest value found to be reliable. Don't lower it without hardware testing.
 

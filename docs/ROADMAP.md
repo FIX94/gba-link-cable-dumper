@@ -126,19 +126,21 @@ A menu for browsing everything that has been dumped and using it again.
 
 ---
 
-## Phase 4: GBA payload improvements ⬜
+## Phase 4: GBA payload improvements 🚧
 
 The program uploaded to the GBA (`gba/source/main.c`) currently just says "Please look at the TV".
 
 ### Game info on the GBA screen
-- ⬜ When a cart is read, show title, game code, maker, ROM size and **detected save type** (libSave already works this out in `SaveSize`)
-- ⬜ Show "No cart / invalid cart" when the header check fails
+- ✅ When a cart is read, show title, game code, maker, version, ROM size and **detected save type** (from libSave's `SaveSize`)
+- ✅ Show "No cartridge found" when the header check fails
 
 ### Progress bar on the GBA screen
-- ⬜ Progress bar and percentage during ROM dumps, save backups, save restores and BIOS dumps
-- ⬜ The payload already knows the total size, so it doesn't need anything extra from the console
-- ⬜ Interrupts are disabled during transfers, so update VRAM directly every N KB (e.g. every 16 KB) inside the send loop, not from a vblank handler. Measure the effect on dump speed.
-- ⬜ "Done" / "Error" screens when a transfer finishes
+- ✅ Progress bar and percentage during ROM dumps, save backups, save restores and BIOS dumps
+- ✅ The payload already knows the total size, so it doesn't need anything extra from the console
+- ✅ Updated with direct map writes right after each word is loaded (a compare per word, a few tile writes per step, no division or printf in the loop)
+- ✅ "Done" messages when a transfer finishes (ROM dumped!, Save backed up!, …)
+- ✅ `make screens` renders the GBA screens to PNG on the Mac for checking layout
+- ⬜ **Test on hardware** and time a 16 MB dump against v1.7 to confirm the bar doesn't slow it down
 
 ### Controls on the GBA
 - ⬜ Let the user start actions from the GBA buttons (e.g. A: dump ROM, B: back up save, Start: cancel)

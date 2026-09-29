@@ -25,6 +25,7 @@ This is a continued fork of [FIX94's GBA Link Cable Dumper](https://github.com/F
 - **Folder browser**: pick or create the output folder on the console.
 - **Portable settings file**: `settings.ini` can live in the default folder or anywhere you choose.
 - **Safe writing**: the card is checked before every write and existing dumps are never overwritten unless you ask for that.
+- **Game info and a progress bar on the GBA screen**: title, game code, ROM size and detected save type as soon as the cartridge is read, plus a live progress bar during every transfer.
 - **No setup on the GBA**: the dumper is sent to the GBA over the cable (multiboot), so the GBA only needs to be switched on.
 
 ---
@@ -55,9 +56,9 @@ Download the latest `.dol` for your console from the [Releases](../../releases) 
 
 1. Plug a GameCube controller into **port 1** and the GBA link cable into **port 2**.
 2. Start the dumper on your console. The screen shows which device and folder dumps will be saved to.
-3. Connect the link cable to the GBA and turn the GBA on **without a cartridge**. The dumper is sent to it automatically, and the GBA screen says "Please look at the TV".
+3. Connect the link cable to the GBA and turn the GBA on **without a cartridge**. The dumper is sent to it automatically, and the GBA screen says "Ready, look at the TV".
 4. Insert the cartridge into the GBA and press **A** on the controller.
-5. The game's name, ID, ROM size and save size are shown. Choose what to do:
+5. The game's name, ID, ROM size and save size are shown on the TV, and the title, code, ROM size and save type on the GBA. Choose what to do:
 
    | Button | Action |
    |---|---|
@@ -66,6 +67,8 @@ Download the latest `.dol` for your console from the [Releases](../../releases) 
    | **Y** | Back up the save |
    | **X** | Restore the save from the SD card to the cartridge |
    | **Z** | Clear the save on the cartridge |
+
+   The GBA shows what it's doing and a progress bar with a percentage for ROM dumps, save transfers and BIOS dumps.
 
 6. Other buttons:
 
@@ -185,6 +188,12 @@ If you move the settings file from the settings screen, a small pointer file (`s
 
 The payload is embedded in the `.dol` at build time, so the console side and GBA side always come from the same build and match.
 
+**The GBA screen and timing.** The console reads each 4-byte word without checking that the GBA has loaded a new one, so the GBA has to keep up. That's about 345 µs, or roughly 5,800 GBA CPU cycles, per word. The progress bar is built to fit in that time:
+- two unused font tiles are replaced with solid bar tiles
+- every division is done before the transfer starts
+- inside the loop the payload only compares a counter, and when a step is crossed it writes a few tile numbers straight into the screen map, with no `printf`
+- the bar is updated right after a word has been loaded, while the console is reading it
+
 ---
 
 ## Building
@@ -228,7 +237,15 @@ The build compiles the GBA payload first, copies it into `data/`, then embeds it
 make test
 ```
 
-Runs host tests for the settings, INI parser, paths and storage code using your normal compiler. You don't need devkitPro or a console. The real source files are compiled against stub libogc headers in [`tests/stub`](tests/stub).
+Runs host tests for the settings, INI parser, paths and storage code, and for the GBA screen's progress bar maths, using your normal compiler. You don't need devkitPro or a console. The real source files are compiled against stub libogc headers in [`tests/stub`](tests/stub).
+
+### GBA screen previews
+
+```bash
+make screens
+```
+
+Renders every GBA payload screen (ready, cart info, ROM dump at 45%, done, no cartridge) to PNG files in `tests/build/screens/`, using the real `gba/source/screen.c` and libgba's font. You can check the layout without a GBA. Needs devkitARM for the font.
 
 ### Versioning
 
@@ -243,6 +260,7 @@ common/version.h           version number, used on screen and in the output file
 common/protocol.h          commands and sizes shared by the GC/Wii side and the GBA payload
 gba/                       GBA multiboot payload (devkitARM), embedded into the dols
   source/main.c            payload: command loop, ROM/save/BIOS transfers
+  source/screen.c          payload screen: cart info, status line, progress bar
   source/libSave.c         save chip access (EEPROM, SRAM, Flash), from SendSave
 source/main.c              entry point
 source/app/app             screen flow, ties everything below together
@@ -282,7 +300,7 @@ docs/ROADMAP.md            planned features
 
 ## Roadmap
 
-Planned work includes save history with timestamps, a graphical interface, a library for browsing and restoring your dumps, and a progress bar, game info and button controls on the GBA screen. See [docs/ROADMAP.md](docs/ROADMAP.md) for the details and current status.
+Planned work includes save history with timestamps, a graphical interface, a library for browsing and restoring your dumps, and button controls on the GBA. See [docs/ROADMAP.md](docs/ROADMAP.md) for the details and current status.
 
 ## Contributing
 

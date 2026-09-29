@@ -10,6 +10,7 @@
 #include "libSave.h"
 #include "protocol.h"
 #include "version.h"
+#include "screen.h"
 
 #define	REG_WAITCNT *(vu16 *)(REG_BASE + 0x204)
 #define JOY_WRITE 2
@@ -53,13 +54,10 @@ int main(void) {
 	irqInit();
 	irqEnable(IRQ_VBLANK);
 
-	consoleDemoInit();
+	screen_init();
 	REG_JOYTR = 0;
-	// ansi escape sequence to set print co-ordinates
-	// /x1b[line;columnH
 	u32 i;
-	iprintf("\x1b[9;2HGBA Link Cable Dumper " APP_VERSION "\n");
-	iprintf("\x1b[10;4HPlease look at the TV\n");
+	progress_t progress;
 	// disable this, needs power
 	SNDSTAT = 0;
 	SNDBIAS = 0;
@@ -84,6 +82,7 @@ int main(void) {
 			if(gamesize == -1)
 			{
 				REG_JOYTR = 0;
+				screen_cart(NULL, -1, 0);
 				continue; //nothing to read
 			}
 			//game in, send header
@@ -94,6 +93,9 @@ int main(void) {
 				REG_HS_CTRL |= JOY_RW;
 			}
 			REG_JOYTR = 0;
+			//the gc side waits for the user now, so there is time to draw
+			screen_cart((const u8*)0x08000000, gamesize, savesize);
+			screen_status("Choose an action on the TV");
 			//wait for other side to choose
 			while((REG_HS_CTRL&JOY_WRITE) == 0) ;
 			REG_HS_CTRL |= JOY_RW;
@@ -101,10 +103,14 @@ int main(void) {
 			if(choseval == GBA_CMD_NONE)
 			{
 				REG_JOYTR = 0;
+				screen_status("Ready, look at the TV");
 				continue; //nothing to read
 			}
 			else if(choseval == GBA_CMD_DUMP_ROM)
 			{
+				//the gc side waits a second before reading, set up the screen now
+				screen_status("Dumping ROM...");
+				progress_start(&progress, gamesize);
 				//disable interrupts
 				u32 prevIrqMask = REG_IME;
 				REG_IME = 0;
@@ -112,14 +118,19 @@ int main(void) {
 				for(i = 0; i < gamesize; i+=4)
 				{
 					REG_JOYTR = *(vu32*)(0x08000000+i);
+					//the word is loaded, update the bar while the gc reads it
+					progress_update(&progress, i+4);
 					while((REG_HS_CTRL&JOY_READ) == 0) ;
 					REG_HS_CTRL |= JOY_RW;
 				}
 				//restore interrupts
 				REG_IME = prevIrqMask;
+				progress_finish(&progress);
+				screen_status_line("ROM dumped!");
 			}
 			else if(choseval == GBA_CMD_BACKUP_SAVE)
 			{
+				screen_status("Reading save...");
 				//disable interrupts
 				u32 prevIrqMask = REG_IME;
 				REG_IME = 0;
@@ -145,6 +156,9 @@ int main(void) {
 				}
 				//restore interrupts
 				REG_IME = prevIrqMask;
+				//the gc side reads straight after the next handshake, draw first
+				screen_status("Sending save...");
+				progress_start(&progress, savesize);
 				//say gc side we read it
 				REG_JOYTR = savesize;
 				//wait for a cmd receive for safety
@@ -154,12 +168,23 @@ int main(void) {
 				for(i = 0; i < savesize; i+=4)
 				{
 					REG_JOYTR = *(vu32*)(save_data+i);
+					progress_update(&progress, i+4);
 					while((REG_HS_CTRL&JOY_READ) == 0) ;
 					REG_HS_CTRL |= JOY_RW;
 				}
+				progress_finish(&progress);
+				screen_status_line("Save backed up!");
 			}
 			else if(choseval == GBA_CMD_RESTORE_SAVE || choseval == GBA_CMD_CLEAR_SAVE)
 			{
+				//the gc side sends straight after seeing the save size, draw first
+				if(choseval == GBA_CMD_RESTORE_SAVE)
+				{
+					screen_status("Receiving save...");
+					progress_start(&progress, savesize);
+				}
+				else
+					screen_status("Clearing save...");
 				REG_JOYTR = savesize;
 				if(choseval == GBA_CMD_RESTORE_SAVE)
 				{
@@ -169,7 +194,11 @@ int main(void) {
 						while((REG_HS_CTRL&JOY_WRITE) == 0) ;
 						REG_HS_CTRL |= JOY_RW;
 						*(vu32*)(save_data+i) = REG_JOYRE;
+						progress_update(&progress, i+4);
 					}
+					progress_finish(&progress);
+					//the gc side waits for us to report back, no rush now
+					screen_status_line("Writing to cartridge...");
 				}
 				else
 				{
@@ -202,6 +231,7 @@ int main(void) {
 				}
 				//restore interrupts
 				REG_IME = prevIrqMask;
+				screen_status_line(choseval == GBA_CMD_RESTORE_SAVE ? "Save restored!" : "Save cleared!");
 				//say gc side we're done
 				REG_JOYTR = 0;
 				//wait for a cmd receive for safety
@@ -216,6 +246,9 @@ int main(void) {
 			u32 choseval = REG_JOYRE;
 			if(choseval == GBA_CMD_DUMP_BIOS)
 			{
+				//the gc side waits a second before reading, set up the screen now
+				screen_status("Dumping BIOS...");
+				progress_start(&progress, GBA_BIOS_SIZE);
 				//disable interrupts
 				u32 prevIrqMask = REG_IME;
 				REG_IME = 0;
@@ -228,11 +261,14 @@ int main(void) {
 					u32 c = MidiKey2Freq((WaveData *)(i-2), 180-12, 0) * 2;
 					u32 d = MidiKey2Freq((WaveData *)(i-1), 180-12, 0) * 2;
 					REG_JOYTR = ((a>>24<<24) | (d>>24<<16) | (c>>24<<8) | (b>>24));
+					progress_update(&progress, i+4);
 					while((REG_HS_CTRL&JOY_READ) == 0) ;
 					REG_HS_CTRL |= JOY_RW;
 				}
 				//restore interrupts
 				REG_IME = prevIrqMask;
+				progress_finish(&progress);
+				screen_status_line("BIOS dumped!");
 			}
 			REG_JOYTR = 0;
 		}
